@@ -4,6 +4,10 @@ const byId = (id) => document.getElementById(id);
 const NUMERIC_FIELDS = new Set([
   'timeout',
   'max_retry',
+  'retry_backoff_base',
+  'retry_backoff_factor',
+  'retry_backoff_max',
+  'retry_budget',
   'refresh_interval_hours',
   'fail_threshold',
   'limit_mb',
@@ -17,6 +21,8 @@ const NUMERIC_FIELDS = new Set([
   'usage_batch_size',
   'usage_max_tokens',
   'reload_interval_sec',
+  'stream_idle_timeout',
+  'video_idle_timeout',
   'nsfw_max_concurrent',
   'nsfw_batch_size',
   'nsfw_max_tokens'
@@ -29,7 +35,7 @@ const LOCALE_MAP = {
     "app_key": { title: "后台密码", desc: "登录 Grok2API 服务管理后台的密码，请妥善保管。" },
     "app_url": { title: "应用地址", desc: "当前 Grok2API 服务的外部访问 URL，用于文件链接访问。" },
     "image_format": { title: "图片格式", desc: "生成的图片格式（url 或 base64）。" },
-    "video_format": { title: "视频格式", desc: "生成的视频格式（仅支持 url）。" }
+    "video_format": { title: "视频格式", desc: "生成的视频格式（html 或 url，url 为处理后的链接）。" }
   },
   "grok": {
     "label": "Grok 设置",
@@ -43,7 +49,13 @@ const LOCALE_MAP = {
     "asset_proxy_url": { title: "资源代理 URL", desc: "代理请求到 Grok 官网的静态资源（图片/视频）地址。" },
     "cf_clearance": { title: "CF Clearance", desc: "Cloudflare 验证 Cookie，用于验证 Cloudflare 的验证。" },
     "max_retry": { title: "最大重试", desc: "请求 Grok 服务失败时的最大重试次数。" },
-    "retry_status_codes": { title: "重试状态码", desc: "触发重试的 HTTP 状态码列表。" }
+    "retry_status_codes": { title: "重试状态码", desc: "触发重试的 HTTP 状态码列表。" },
+    "retry_backoff_base": { title: "退避基数", desc: "重试退避的基础延迟（秒）。" },
+    "retry_backoff_factor": { title: "退避倍率", desc: "重试退避的指数放大系数。" },
+    "retry_backoff_max": { title: "退避上限", desc: "单次重试等待的最大延迟（秒）。" },
+    "retry_budget": { title: "退避预算", desc: "单次请求的最大重试总耗时（秒）。" },
+    "stream_idle_timeout": { title: "流空闲超时", desc: "流式响应空闲超时（秒），超过将断开。" },
+    "video_idle_timeout": { title: "视频空闲超时", desc: "视频生成空闲超时（秒），超过将断开。" }
   },
   "token": {
     "label": "Token 池设置",
@@ -268,7 +280,8 @@ function renderConfig(data) {
         ]);
       }
       else if (key === 'video_format') {
-        built = buildSelectInput(section, key, 'url', [
+        built = buildSelectInput(section, key, val, [
+          { val: 'html', text: 'HTML' },
           { val: 'url', text: 'URL' }
         ]);
       }

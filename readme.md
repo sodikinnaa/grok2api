@@ -112,8 +112,8 @@ curl http://localhost:8000/v1/chat/completions \
 | `thinking`           | string  | 思维链模式                     | `enabled`, `disabled`, `null`                      |
 | `video_config`       | object  | **视频模型专用配置对象**       | -                                                  |
 | └─`aspect_ratio`     | string  | 视频宽高比                     | `16:9`, `9:16`, `1:1`, `2:3`, `3:2`                |
-| └─`video_length`     | integer | 视频时长 (秒)                  | `5` - `15`                                         |
-| └─`resolution`       | string  | 分辨率                         | `SD`, `HD`                                         |
+| └─`video_length`     | integer | 视频时长 (秒)                  | `6`, `10`                                          |
+| └─`resolution_name`  | string  | 分辨率                         | `480p`, `720p`                                     |
 | └─`preset`           | string  | 风格预设                       | `fun`, `normal`, `spicy`, `custom`                 |
 
 **消息格式 (messages)**：
@@ -190,7 +190,7 @@ curl http://localhost:8000/v1/images/generations \
 |                       | `app_key`                  | 后台密码     | 登录 Grok2API 服务管理后台的密码，请妥善保管。       | `grok2api`                                              |
 |                       | `api_key`                  | API 密钥     | 调用 Grok2API 服务所需的 Bearer Token，请妥善保管。  | `grok2api`                                              |
 |                       | `image_format`             | 图片格式     | 生成的图片格式（url 或 base64）。                    | `url`                                                   |
-|                       | `video_format`             | 视频格式     | 生成的视频格式（仅支持 url）。                       | `url`                                                   |
+|                       | `video_format`             | 视频格式     | 生成的视频格式（html 或 url，url 为处理后的链接）。  | `html`                                                  |
 | **grok**        | `temporary`                | 临时对话     | 是否启用临时对话模式。                               | `true`                                                  |
 |                       | `stream`                   | 流式响应     | 是否默认启用流式输出。                               | `true`                                                  |
 |                       | `thinking`                 | 思维链       | 是否启用模型思维链输出。                             | `true`                                                  |
@@ -202,6 +202,12 @@ curl http://localhost:8000/v1/images/generations \
 |                       | `cf_clearance`             | CF Clearance | Cloudflare 验证 Cookie，用于验证 Cloudflare 的验证。 | `""`                                                    |
 |                       | `max_retry`                | 最大重试     | 请求 Grok 服务失败时的最大重试次数。                 | `3`                                                     |
 |                       | `retry_status_codes`       | 重试状态码   | 触发重试的 HTTP 状态码列表。                         | `[401, 429, 403]`                                       |
+|                       | `retry_backoff_base`       | 退避基数     | 重试退避的基础延迟（秒）。                           | `0.5`                                                   |
+|                       | `retry_backoff_factor`     | 退避倍率     | 重试退避的指数放大系数。                             | `2.0`                                                   |
+|                       | `retry_backoff_max`        | 退避上限     | 单次重试等待的最大延迟（秒）。                       | `30.0`                                                  |
+|                       | `retry_budget`             | 退避预算     | 单次请求的最大重试总耗时（秒）。                     | `90.0`                                                  |
+|                       | `stream_idle_timeout`      | 流空闲超时   | 流式响应空闲超时（秒），超过将断开。                 | `45.0`                                                  |
+|                       | `video_idle_timeout`       | 视频空闲超时 | 视频生成空闲超时（秒），超过将断开。                 | `90.0`                                                  |
 | **token**       | `auto_refresh`             | 自动刷新     | 是否开启 Token 自动刷新机制。                        | `true`                                                  |
 |                       | `refresh_interval_hours`   | 刷新间隔     | Token 刷新的时间间隔（小时）。                       | `8`                                                     |
 |                       | `fail_threshold`           | 失败阈值     | 单个 Token 连续失败多少次后被标记为不可用。          | `5`                                                     |
