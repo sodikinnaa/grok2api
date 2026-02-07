@@ -7,7 +7,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from typing import Optional
 from pydantic import BaseModel
 from app.core.auth import verify_api_key, verify_app_key, get_admin_api_key
@@ -209,6 +209,11 @@ async def cancel_batch(task_id: str):
 async def admin_login_page():
     """管理后台登录页"""
     return await render_template("login/login.html")
+
+
+@router.get("/", include_in_schema=False)
+async def root_redirect():
+    return RedirectResponse(url="/admin")
 
 
 @router.get("/admin/config", response_class=HTMLResponse, include_in_schema=False)
