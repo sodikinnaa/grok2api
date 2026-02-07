@@ -5,8 +5,6 @@
   "env": {
     "LOG_LEVEL": "INFO",
     "LOG_FILE_ENABLED": "false",
-    "DATA_DIR": "/tmp/data",
-    "SERVER_STORAGE_TYPE": "",
-    "SERVER_STORAGE_URL": ""
+    "DATA_DIR": "/tmp/data"
   }
 }
