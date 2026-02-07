@@ -158,6 +158,14 @@ class VideoService:
             "message": f"{prompt} {mode_flag}",
             "toolOverrides": {"videoGen": True},
             "enableSideBySide": True,
+            "deviceEnvInfo": {
+                "darkModeEnabled": False,
+                "devicePixelRatio": 2,
+                "screenWidth": 1920,
+                "screenHeight": 1080,
+                "viewportWidth": 1920,
+                "viewportHeight": 1080,
+            },
             "responseMetadata": {
                 "experiments": [],
                 "modelConfigOverride": {
