@@ -31,6 +31,14 @@ git clone https://github.com/chenyme/grok2api
 docker compose up -d
 ```
 
+### One-click deploy (Render)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/chenyme/grok2api)
+
+> Render free instances spin down after 15 minutes of inactivity; data is lost on resume/restart/redeploy. 
+> 
+> For persistence, use MySQL / Redis / PostgreSQL, on Render set: SERVER_STORAGE_TYPE (mysql/redis/pgsql) and SERVER_STORAGE_URL.
+
 ### Admin panel
 
 URL: `http://<host>:8000/admin`  
@@ -109,6 +117,8 @@ Note: any other parameters will be discarded and ignored.
 <br>
 
 </details>
+
+<br>
 
 ### `POST /v1/images/generations`
 > Image generation endpoint
