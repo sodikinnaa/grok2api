@@ -17,7 +17,7 @@ from app.core.exceptions import (
     ErrorType,
 )
 from app.services.grok.models.model import ModelService
-from app.services.token import get_token_manager, EffortType, TokenInfo
+from app.services.token import get_token_manager, EffortType
 from app.services.grok.processors import VideoStreamProcessor, VideoCollectProcessor
 from app.services.grok.utils.headers import apply_statsig, build_sso_cookie
 from app.services.grok.utils.stream import wrap_stream_with_usage
@@ -305,9 +305,12 @@ class VideoService:
         token_mgr = await get_token_manager()
         await token_mgr.reload_if_stale()
 
-        # 使用智能路由选择 token（根据视频需求）
+        # 使用智能路由选择 token（根据视频需求与候选池）
+        pool_candidates = ModelService.pool_candidates_for_model(model)
         token_info = token_mgr.get_token_for_video(
-            resolution=resolution, video_length=video_length
+            resolution=resolution,
+            video_length=video_length,
+            pool_candidates=pool_candidates,
         )
 
         if not token_info:
