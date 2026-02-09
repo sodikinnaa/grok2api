@@ -644,25 +644,7 @@ async def edit_image(
             parent_post_id
         )
 
-    raw_payload = {
-        "temporary": bool(get_config("chat.temporary")),
-        "modelName": model_info.grok_model,
-        "message": edit_request.prompt,
-        "enableImageGeneration": True,
-        "returnImageBytes": False,
-        "returnRawGrokInXaiRequest": False,
-        "enableImageStreaming": True,
-        "imageGenerationCount": 2,
-        "forceConcise": False,
-        "toolOverrides": {"imageGen": True},
-        "enableSideBySide": True,
-        "sendFinalMetadata": True,
-        "isReasoning": False,
-        "disableTextFollowUps": True,
-        "responseMetadata": {"modelConfigOverride": model_config_override},
-        "disableMemory": False,
-        "forceSideBySide": False,
-    }
+    tool_overrides = {"imageGen": True}
 
     # 流式模式
     if edit_request.stream:
@@ -673,7 +655,8 @@ async def edit_image(
             model=model_info.grok_model,
             mode=None,
             stream=True,
-            raw_payload=raw_payload,
+            tool_overrides=tool_overrides,
+            model_config_override=model_config_override,
         )
 
         processor = ImageStreamProcessor(
@@ -703,7 +686,8 @@ async def edit_image(
             model=model_info.grok_model,
             mode=None,
             stream=True,
-            raw_payload=raw_payload,
+            tool_overrides=tool_overrides,
+            model_config_override=model_config_override,
         )
         processor = ImageCollectProcessor(
             model_info.model_id, token, response_format=response_format

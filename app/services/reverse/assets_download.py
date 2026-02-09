@@ -62,7 +62,7 @@ class AssetsDownloadReverse:
             headers = build_headers(
                 cookie_token=token,
                 content_type=content_type,
-                origin="https://grok.com",
+                origin="https://assets.grok.com",
                 referer="https://grok.com/",
             )
             ## Align with browser download navigation headers

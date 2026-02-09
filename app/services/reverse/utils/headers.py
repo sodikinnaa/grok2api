@@ -2,6 +2,7 @@
 
 import uuid
 import orjson
+from urllib.parse import urlparse
 from typing import Dict, Optional
 
 from app.core.config import get_config
@@ -80,7 +81,9 @@ def build_headers(
         headers["Sec-Fetch-Dest"] = "empty"
 
     # Sec-Fetch-Site
-    if headers["Origin"] == headers["Referer"]:
+    origin_domain = urlparse(headers.get("Origin", "")).hostname
+    referer_domain = urlparse(headers.get("Referer", "")).hostname
+    if origin_domain and referer_domain and origin_domain == referer_domain:
         headers["Sec-Fetch-Site"] = "same-origin"
     else:
         headers["Sec-Fetch-Site"] = "same-site"

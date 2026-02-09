@@ -3,9 +3,7 @@ Grok 视频生成服务
 """
 
 import asyncio
-from typing import AsyncGenerator, Optional
-
-import orjson
+from typing import AsyncGenerator
 from curl_cffi.requests import AsyncSession
 
 from app.core.logger import logger
@@ -19,11 +17,8 @@ from app.core.exceptions import (
 from app.services.grok.models.model import ModelService
 from app.services.token import get_token_manager, EffortType
 from app.services.grok.processors import VideoStreamProcessor, VideoCollectProcessor
-from app.services.grok.utils.headers import apply_statsig, build_sso_cookie
 from app.services.grok.utils.stream import wrap_stream_with_usage
-
-CREATE_POST_API = "https://grok.com/rest/media/post/create"
-CHAT_API = "https://grok.com/rest/app-chat/conversations/new"
+from app.services.reverse import AppChatReverse, MediaPostReverse
 
 _MEDIA_SEMAPHORE = None
 _MEDIA_SEM_VALUE = 0
@@ -42,46 +37,8 @@ def _get_semaphore() -> asyncio.Semaphore:
 class VideoService:
     """视频生成服务"""
 
-    def __init__(self, proxy: str = None):
-        self.proxy = proxy or get_config("network.base_proxy_url")
+    def __init__(self):
         self.timeout = get_config("network.timeout")
-
-    def _build_headers(
-        self, token: str, referer: str = "https://grok.com/imagine"
-    ) -> dict:
-        """构建请求头"""
-        user_agent = get_config("security.user_agent")
-        headers = {
-            "Accept": "*/*",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "Baggage": "sentry-environment=production,sentry-release=d6add6fb0460641fd482d767a335ef72b9b6abb8,sentry-public_key=b311e0f2690c81f25e2c4cf6d4f7ce1c",
-            "Cache-Control": "no-cache",
-            "Content-Type": "application/json",
-            "Origin": "https://grok.com",
-            "Pragma": "no-cache",
-            "Priority": "u=1, i",
-            "Referer": referer,
-            "Sec-Ch-Ua": '"Google Chrome";v="136", "Chromium";v="136", "Not(A:Brand";v="24"',
-            "Sec-Ch-Ua-Arch": "arm",
-            "Sec-Ch-Ua-Bitness": "64",
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Model": "",
-            "Sec-Ch-Ua-Platform": '"macOS"',
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-origin",
-            "User-Agent": user_agent,
-        }
-
-        apply_statsig(headers)
-        headers["Cookie"] = build_sso_cookie(token)
-
-        return headers
-
-    def _build_proxies(self) -> Optional[dict]:
-        """构建代理"""
-        return {"http": self.proxy, "https": self.proxy} if self.proxy else None
 
     async def create_post(
         self,
@@ -92,28 +49,15 @@ class VideoService:
     ) -> str:
         """创建媒体帖子，返回 post ID"""
         try:
-            headers = self._build_headers(token)
-
-            # 根据类型构建不同的载荷
-            if media_type == "MEDIA_POST_TYPE_IMAGE" and media_url:
-                payload = {"mediaType": media_type, "mediaUrl": media_url}
-            else:
-                payload = {"mediaType": media_type, "prompt": prompt}
+            if media_type == "MEDIA_POST_TYPE_IMAGE" and not media_url:
+                raise ValidationException("media_url is required for image posts")
 
             async with AsyncSession() as session:
-                response = await session.post(
-                    CREATE_POST_API,
-                    headers=headers,
-                    json=payload,
-                    impersonate=get_config("security.browser"),
-                    timeout=30,
-                    proxies=self._build_proxies(),
-                )
-
-            if response.status_code != 200:
-                logger.error(f"Create post failed: {response.status_code}")
-                raise UpstreamException(
-                    f"Failed to create post: {response.status_code}"
+                response = await MediaPostReverse.request(
+                    session,
+                    token,
+                    media_type,
+                    media_url or "",
                 )
 
             post_id = response.json().get("post", {}).get("id", "")
@@ -198,40 +142,25 @@ class VideoService:
         """内部生成逻辑"""
         session = None
         try:
-            headers = self._build_headers(token)
             payload = self._build_payload(
                 prompt, post_id, aspect_ratio, video_length, resolution_name, preset
             )
 
-            session = AsyncSession(impersonate=get_config("security.browser"))
-            response = await session.post(
-                CHAT_API,
-                headers=headers,
-                data=orjson.dumps(payload),
-                timeout=self.timeout,
-                stream=True,
-                proxies=self._build_proxies(),
+            session = AsyncSession()
+            stream_response = await AppChatReverse.request(
+                session,
+                token,
+                message=payload.get("message"),
+                model=payload.get("modelName"),
+                tool_overrides=payload.get("toolOverrides"),
+                model_config_override=(
+                    (payload.get("responseMetadata") or {}).get("modelConfigOverride")
+                ),
             )
-
-            if response.status_code != 200:
-                logger.error(
-                    f"Video generation failed: status={response.status_code}, post_id={post_id}"
-                )
-                raise UpstreamException(
-                    message=f"Video generation failed: {response.status_code}",
-                    details={"status": response.status_code},
-                )
 
             logger.info(f"Video generation started: post_id={post_id}")
 
-            async def stream_response():
-                try:
-                    async for line in response.aiter_lines():
-                        yield line
-                finally:
-                    await session.close()
-
-            return stream_response()
+            return stream_response
 
         except Exception as e:
             if session:
