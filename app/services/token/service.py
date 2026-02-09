@@ -43,22 +43,19 @@ class TokenService:
         return await manager.consume(token, effort)
 
     @staticmethod
-    async def sync_usage(
-        token: str, model: str, effort: EffortType = EffortType.LOW
-    ) -> bool:
+    async def sync_usage(token: str, effort: EffortType = EffortType.LOW) -> bool:
         """
         同步 Token 使用量（优先 API，降级本地）
 
         Args:
             token: Token 字符串
-            model: 模型名称
             effort: 降级时的消耗力度
 
         Returns:
             是否成功
         """
         manager = await get_token_manager()
-        return await manager.sync_usage(token, model, effort)
+        return await manager.sync_usage(token, effort)
 
     @staticmethod
     async def record_fail(token: str, status_code: int = 401, reason: str = "") -> bool:

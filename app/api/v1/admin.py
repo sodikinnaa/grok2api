@@ -864,9 +864,7 @@ async def refresh_tokens_api(data: dict):
         batch_size = get_config("performance.usage_batch_size")
 
         async def _refresh_one(t):
-            return await mgr.sync_usage(
-                t, "grok-3", consume_on_fail=False, is_usage=False
-            )
+            return await mgr.sync_usage(t, consume_on_fail=False, is_usage=False)
 
         raw_results = await run_in_batches(
             unique_tokens,
@@ -918,9 +916,7 @@ async def refresh_tokens_api_async(data: dict):
         try:
 
             async def _refresh_one(t: str):
-                return await mgr.sync_usage(
-                    t, "grok-3", consume_on_fail=False, is_usage=False
-                )
+                return await mgr.sync_usage(t, consume_on_fail=False, is_usage=False)
 
             async def _on_item(item: str, res: dict):
                 task.record(bool(res.get("ok")))

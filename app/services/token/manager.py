@@ -329,7 +329,6 @@ class TokenManager:
     async def sync_usage(
         self,
         token_str: str,
-        model_name: str,
         fallback_effort: EffortType = EffortType.LOW,
         consume_on_fail: bool = True,
         is_usage: bool = True,
@@ -341,7 +340,6 @@ class TokenManager:
 
         Args:
             token_str: Token 字符串（可带 sso= 前缀）
-            model_name: 模型名称（用于 API 查询）
             fallback_effort: 降级时的消耗力度
             consume_on_fail: 失败时是否降级扣费
             is_usage: 是否记录为一次使用（影响 use_count）
@@ -367,7 +365,7 @@ class TokenManager:
             from app.services.grok.services.usage import UsageService
 
             usage_service = UsageService()
-            result = await usage_service.get(token_str, model_name=model_name)
+            result = await usage_service.get(token_str)
 
             if result and "remainingTokens" in result:
                 old_quota = target_token.quota
