@@ -15,6 +15,12 @@ let pageSize = 50;
 
 const byId = (id) => document.getElementById(id);
 const qsa = (selector) => document.querySelectorAll(selector);
+const DEFAULT_QUOTA_BASIC = 80;
+const DEFAULT_QUOTA_SUPER = 140;
+
+function getDefaultQuotaForPool(pool) {
+  return pool === 'ssoSuper' ? DEFAULT_QUOTA_SUPER : DEFAULT_QUOTA_BASIC;
+}
 
 function setText(id, text) {
   const el = byId(id);
@@ -51,6 +57,16 @@ function downloadTextFile(content, filename) {
   a.click();
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
+}
+
+async function readJsonResponse(res) {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    throw new Error(`响应不是有效 JSON (HTTP ${res.status})`);
+  }
 }
 
 function getSelectedTokens() {
@@ -93,6 +109,7 @@ function getPaginationData() {
 async function init() {
   apiKey = await ensureApiKey();
   if (apiKey === null) return;
+  setupEditPoolDefaults();
   setupConfirmDialog();
   loadData();
 }
@@ -135,7 +152,13 @@ function processTokens(data) {
             note: t.note || '',
             fail_count: t.fail_count || 0,
             use_count: t.use_count || 0,
-            tags: t.tags || []
+            tags: t.tags || [],
+            created_at: t.created_at,
+            last_used_at: t.last_used_at,
+            last_fail_at: t.last_fail_at,
+            last_fail_reason: t.last_fail_reason,
+            last_sync_at: t.last_sync_at,
+            last_asset_clear_at: t.last_asset_clear_at
           };
         flatTokens.push({ ...tObj, pool: pool, _selected: false });
       });
@@ -405,12 +428,22 @@ function openEditModal(index) {
     byId('edit-original-token').value = '';
     byId('edit-original-pool').value = '';
     byId('edit-pool').value = 'ssoBasic';
-    byId('edit-quota').value = 80;
+    byId('edit-quota').value = getDefaultQuotaForPool('ssoBasic');
     byId('edit-note').value = '';
     document.querySelector('#edit-modal h3').innerText = '添加 Token';
   }
 
   openModal('edit-modal');
+}
+
+function setupEditPoolDefaults() {
+  const poolSelect = byId('edit-pool');
+  const quotaInput = byId('edit-quota');
+  if (!poolSelect || !quotaInput) return;
+  poolSelect.addEventListener('change', () => {
+    if (currentEditIndex >= 0) return;
+    quotaInput.value = getDefaultQuotaForPool(poolSelect.value);
+  });
 }
 
 function closeEditModal() {
@@ -484,14 +517,22 @@ async function syncToServer() {
   const newTokens = {};
   flatTokens.forEach(t => {
     if (!newTokens[t.pool]) newTokens[t.pool] = [];
-    newTokens[t.pool].push({
+    const payload = {
       token: t.token,
       status: t.status,
       quota: t.quota,
       note: t.note,
       fail_count: t.fail_count,
-      use_count: t.use_count || 0
-    });
+      use_count: t.use_count || 0,
+      tags: Array.isArray(t.tags) ? t.tags : []
+    };
+    if (typeof t.created_at === 'number') payload.created_at = t.created_at;
+    if (typeof t.last_used_at === 'number') payload.last_used_at = t.last_used_at;
+    if (typeof t.last_fail_at === 'number') payload.last_fail_at = t.last_fail_at;
+    if (typeof t.last_sync_at === 'number') payload.last_sync_at = t.last_sync_at;
+    if (typeof t.last_asset_clear_at === 'number') payload.last_asset_clear_at = t.last_asset_clear_at;
+    if (typeof t.last_fail_reason === 'string' && t.last_fail_reason) payload.last_fail_reason = t.last_fail_reason;
+    newTokens[t.pool].push(payload);
   });
 
   try {
@@ -525,6 +566,7 @@ async function submitImport() {
   const pool = byId('import-pool').value.trim() || 'ssoBasic';
   const text = byId('import-text').value;
   const lines = text.split('\n');
+  const defaultQuota = getDefaultQuotaForPool(pool);
 
   lines.forEach(line => {
     const t = line.trim();
@@ -533,8 +575,10 @@ async function submitImport() {
         token: t,
         pool: pool,
         status: 'active',
-        quota: 80,
+        quota: defaultQuota,
         note: '',
+        tags: [],
+        fail_count: 0,
         use_count: 0,
         _selected: false
       });
@@ -1004,8 +1048,15 @@ async function batchEnableNSFW() {
       body: JSON.stringify({ tokens })
     });
 
-    const data = await res.json();
-    if (!res.ok || data.status !== 'success') {
+    const data = await readJsonResponse(res);
+    if (!res.ok) {
+      const detail = data && (data.detail || data.message);
+      throw new Error(detail || `HTTP ${res.status}`);
+    }
+    if (!data) {
+      throw new Error(`空响应 (HTTP ${res.status})`);
+    }
+    if (data.status !== 'success') {
       throw new Error(data.detail || '请求失败');
     }
 

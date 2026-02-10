@@ -29,10 +29,14 @@ import orjson
 import aiofiles
 from app.core.logger import logger
 
+# 数据目录（支持通过环境变量覆盖）
+DEFAULT_DATA_DIR = Path(__file__).parent.parent.parent / "data"
+DATA_DIR = Path(os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR))).expanduser()
+
 # 配置文件路径
-CONFIG_FILE = Path(__file__).parent.parent.parent / "data" / "config.toml"
-TOKEN_FILE = Path(__file__).parent.parent.parent / "data" / "token.json"
-LOCK_DIR = Path(__file__).parent.parent.parent / "data" / ".locks"
+CONFIG_FILE = DATA_DIR / "config.toml"
+TOKEN_FILE = DATA_DIR / "token.json"
+LOCK_DIR = DATA_DIR / ".locks"
 
 
 # JSON 序列化优化助手函数

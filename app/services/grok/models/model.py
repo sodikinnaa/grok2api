@@ -3,7 +3,7 @@ Grok 模型管理服务
 """
 
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from pydantic import BaseModel, Field
 
 from app.core.exceptions import ValidationException
@@ -44,37 +44,44 @@ class ModelService:
         ModelInfo(
             model_id="grok-3",
             grok_model="grok-3",
-            model_mode="MODEL_MODE_AUTO",
+            model_mode="MODEL_MODE_GROK_3",
             cost=Cost.LOW,
-            display_name="Grok 3",
+            display_name="GROK-3",
         ),
         ModelInfo(
-            model_id="grok-3-fast",
+            model_id="grok-3-mini",
             grok_model="grok-3",
+            model_mode="MODEL_MODE_GROK_3_MINI_THINKING",
             cost=Cost.LOW,
-            model_mode="MODEL_MODE_FAST",
-            display_name="Grok 3 Fast",
+            display_name="GROK-3-MINI",
+        ),
+        ModelInfo(
+            model_id="grok-3-thinking",
+            grok_model="grok-3",
+            model_mode="MODEL_MODE_GROK_3_THINKING",
+            cost=Cost.LOW,
+            display_name="GROK-3-THINKING",
         ),
         ModelInfo(
             model_id="grok-4",
             grok_model="grok-4",
-            model_mode="MODEL_MODE_AUTO",
+            model_mode="MODEL_MODE_GROK_4",
             cost=Cost.LOW,
-            display_name="Grok 4",
+            display_name="GROK-4",
         ),
         ModelInfo(
             model_id="grok-4-mini",
-            grok_model="grok-4-mini-thinking-tahoe",
+            grok_model="grok-4-mini",
             model_mode="MODEL_MODE_GROK_4_MINI_THINKING",
             cost=Cost.LOW,
-            display_name="Grok 4 Mini",
+            display_name="GROK-4-MINI",
         ),
         ModelInfo(
-            model_id="grok-4-fast",
+            model_id="grok-4-thinking",
             grok_model="grok-4",
-            model_mode="MODEL_MODE_FAST",
+            model_mode="MODEL_MODE_GROK_4_THINKING",
             cost=Cost.LOW,
-            display_name="Grok 4 Fast",
+            display_name="GROK-4-THINKING",
         ),
         ModelInfo(
             model_id="grok-4-heavy",
@@ -82,28 +89,35 @@ class ModelService:
             model_mode="MODEL_MODE_HEAVY",
             cost=Cost.HIGH,
             tier=Tier.SUPER,
-            display_name="Grok 4 Heavy",
+            display_name="GROK-4-HEAVY",
+        ),
+        ModelInfo(
+            model_id="grok-4.1-mini",
+            grok_model="grok-4-1-thinking-1129",
+            model_mode="MODEL_MODE_GROK_4_1_MINI_THINKING",
+            cost=Cost.LOW,
+            display_name="GROK-4.1-MINI",
         ),
         ModelInfo(
             model_id="grok-4.1-fast",
             grok_model="grok-4-1-thinking-1129",
             model_mode="MODEL_MODE_FAST",
             cost=Cost.LOW,
-            display_name="Grok 4.1 Fast",
+            display_name="GROK-4.1-FAST",
         ),
         ModelInfo(
             model_id="grok-4.1-expert",
             grok_model="grok-4-1-thinking-1129",
             model_mode="MODEL_MODE_EXPERT",
-            cost=Cost.LOW,
-            display_name="Grok 4.1 Expert",
+            cost=Cost.HIGH,
+            display_name="GROK-4.1-EXPERT",
         ),
         ModelInfo(
             model_id="grok-4.1-thinking",
             grok_model="grok-4-1-thinking-1129",
             model_mode="MODEL_MODE_GROK_4_1_THINKING",
             cost=Cost.HIGH,
-            display_name="Grok 4.1 Thinking",
+            display_name="GROK-4.1-THINKING",
         ),
         ModelInfo(
             model_id="grok-imagine-1.0",
@@ -112,6 +126,15 @@ class ModelService:
             cost=Cost.HIGH,
             display_name="Grok Image",
             description="Image generation model",
+            is_image=True,
+        ),
+        ModelInfo(
+            model_id="grok-imagine-1.0-edit",
+            grok_model="imagine-image-edit",
+            model_mode="MODEL_MODE_FAST",
+            cost=Cost.HIGH,
+            display_name="Grok Image Edit",
+            description="Image edit model",
             is_image=True,
         ),
         ModelInfo(
@@ -157,6 +180,15 @@ class ModelService:
         if model and model.tier == Tier.SUPER:
             return "ssoSuper"
         return "ssoBasic"
+
+    @classmethod
+    def pool_candidates_for_model(cls, model_id: str) -> List[str]:
+        """按优先级返回可用 Token 池列表"""
+        model = cls.get(model_id)
+        if model and model.tier == Tier.SUPER:
+            return ["ssoSuper"]
+        # 基础模型优先使用 basic 池，缺失时可回退到 super 池
+        return ["ssoBasic", "ssoSuper"]
 
 
 __all__ = ["ModelService"]

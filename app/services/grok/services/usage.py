@@ -3,7 +3,6 @@ Grok 用量服务
 """
 
 import asyncio
-import uuid
 from typing import Dict
 
 from curl_cffi.requests import AsyncSession
@@ -11,41 +10,25 @@ from curl_cffi.requests import AsyncSession
 from app.core.logger import logger
 from app.core.config import get_config
 from app.core.exceptions import UpstreamException
-from app.services.grok.statsig import StatsigService
-from app.services.grok.retry import retry_on_status
-
+from app.services.grok.utils.headers import apply_statsig, build_sso_cookie
+from app.services.grok.utils.retry import retry_on_status
 
 LIMITS_API = "https://grok.com/rest/rate-limits"
-BROWSER = "chrome136"
-TIMEOUT = 10
-DEFAULT_MAX_CONCURRENT = 25
-_USAGE_SEMAPHORE = asyncio.Semaphore(DEFAULT_MAX_CONCURRENT)
-_USAGE_SEM_VALUE = DEFAULT_MAX_CONCURRENT
 
-
-def _get_usage_semaphore() -> asyncio.Semaphore:
-    global _USAGE_SEMAPHORE, _USAGE_SEM_VALUE
-    value = get_config("performance.usage_max_concurrent", DEFAULT_MAX_CONCURRENT)
-    try:
-        value = int(value)
-    except Exception:
-        value = DEFAULT_MAX_CONCURRENT
-    value = max(1, value)
-    if value != _USAGE_SEM_VALUE:
-        _USAGE_SEM_VALUE = value
-        _USAGE_SEMAPHORE = asyncio.Semaphore(value)
-    return _USAGE_SEMAPHORE
+_USAGE_SEMAPHORE = asyncio.Semaphore(25)
+_USAGE_SEM_VALUE = 25
 
 
 class UsageService:
     """用量查询服务"""
 
     def __init__(self, proxy: str = None):
-        self.proxy = proxy or get_config("grok.base_proxy_url", "")
-        self.timeout = get_config("grok.timeout", TIMEOUT)
+        self.proxy = proxy or get_config("network.base_proxy_url")
+        self.timeout = get_config("network.timeout")
 
     def _build_headers(self, token: str) -> dict:
         """构建请求头"""
+        user_agent = get_config("security.user_agent")
         headers = {
             "Accept": "*/*",
             "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -66,17 +49,11 @@ class UsageService:
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-origin",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+            "User-Agent": user_agent,
         }
 
-        # Statsig ID
-        headers["x-statsig-id"] = StatsigService.gen_id()
-        headers["x-xai-request-id"] = str(uuid.uuid4())
-
-        # Cookie
-        token = token[4:] if token.startswith("sso=") else token
-        cf = get_config("grok.cf_clearance", "")
-        headers["Cookie"] = f"sso={token};cf_clearance={cf}" if cf else f"sso={token}"
+        apply_statsig(headers)
+        headers["Cookie"] = build_sso_cookie(token)
 
         return headers
 
@@ -98,7 +75,17 @@ class UsageService:
         Raises:
             UpstreamException: 当获取失败且重试耗尽时
         """
-        async with _get_usage_semaphore():
+        value = get_config("performance.usage_max_concurrent")
+        try:
+            value = int(value)
+        except Exception:
+            value = 25
+        value = max(1, value)
+        global _USAGE_SEMAPHORE, _USAGE_SEM_VALUE
+        if value != _USAGE_SEM_VALUE:
+            _USAGE_SEM_VALUE = value
+            _USAGE_SEMAPHORE = asyncio.Semaphore(value)
+        async with _USAGE_SEMAPHORE:
             # 定义状态码提取器
             def extract_status(e: Exception) -> int | None:
                 if isinstance(e, UpstreamException) and e.details:
@@ -110,13 +97,14 @@ class UsageService:
                 try:
                     headers = self._build_headers(token)
                     payload = {"requestKind": "DEFAULT", "modelName": model_name}
+                    browser = get_config("security.browser")
 
                     async with AsyncSession() as session:
                         response = await session.post(
                             LIMITS_API,
                             headers=headers,
                             json=payload,
-                            impersonate=BROWSER,
+                            impersonate=browser,
                             timeout=self.timeout,
                             proxies=self._build_proxies(),
                         )
@@ -124,10 +112,14 @@ class UsageService:
                     if response.status_code == 200:
                         data = response.json()
                         remaining = data.get("remainingTokens", 0)
-                        logger.info(f"Usage: quota {remaining} remaining")
+                        logger.info(
+                            f"Usage sync success: remaining={remaining}, token={token[:10]}..."
+                        )
                         return data
 
-                    logger.error(f"Usage failed: {response.status_code}")
+                    logger.error(
+                        f"Usage sync failed: status={response.status_code}, token={token[:10]}..."
+                    )
 
                     raise UpstreamException(
                         message=f"Failed to get usage stats: {response.status_code}",

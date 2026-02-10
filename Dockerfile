@@ -3,9 +3,11 @@ FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     TZ=Asia/Shanghai \
-    VIRTUAL_ENV=/opt/venv
+    # 把 uv 包安装到系统 Python 环境
+    UV_PROJECT_ENVIRONMENT=/opt/venv
 
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+# 确保 uv 的 bin 目录
+ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tzdata ca-certificates \
@@ -13,21 +15,23 @@ RUN apt-get update \
 
 WORKDIR /app
 
-RUN python -m venv "$VIRTUAL_ENV" \
-    && pip install --no-cache-dir uv
+# 安装 uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-COPY pyproject.toml uv.lock /app/
+COPY pyproject.toml uv.lock ./
 
-RUN uv sync --frozen --no-dev --no-install-project --active
+RUN uv sync --frozen --no-dev --no-install-project
 
-COPY config.defaults.toml /app/config.defaults.toml
-COPY app /app/app
-COPY main.py /app/main.py
-COPY scripts /app/scripts
+COPY config.defaults.toml ./
+COPY app ./app
+COPY main.py ./
+COPY scripts ./scripts
 
-RUN mkdir -p /app/data /app/data/tmp /app/logs
+RUN mkdir -p /app/data /app/data/tmp /app/logs \
+    && chmod +x /app/scripts/entrypoint.sh
 
 EXPOSE 8000
 
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -8,8 +8,8 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from app.services.grok.chat import ChatService
-from app.services.grok.model import ModelService
+from app.services.grok.services.chat import ChatService
+from app.services.grok.models.model import ModelService
 from app.core.exceptions import ValidationException
 
 
@@ -48,7 +48,7 @@ class VideoConfig(BaseModel):
     aspect_ratio: Optional[str] = Field(
         "3:2", description="视频比例: 3:2, 16:9, 1:1 等"
     )
-    video_length: Optional[int] = Field(6, description="视频时长(秒): 6 或 10")
+    video_length: Optional[int] = Field(6, description="视频时长(秒): 6 / 10 / 15")
     resolution_name: Optional[str] = Field("480p", description="视频分辨率: 480p, 720p")
     preset: Optional[str] = Field("custom", description="风格预设: fun, normal, spicy")
 
@@ -68,9 +68,9 @@ class VideoConfig(BaseModel):
     @classmethod
     def validate_video_length(cls, v):
         if v is not None:
-            if v not in (6, 10):
+            if v not in (6, 10, 15):
                 raise ValidationException(
-                    message="video_length must be 6 or 10 seconds",
+                    message="video_length must be 6, 10, or 15 seconds",
                     param="video_config.video_length",
                     code="invalid_video_length",
                 )
@@ -260,7 +260,7 @@ async def chat_completions(request: ChatCompletionRequest):
     # 检测视频模型
     model_info = ModelService.get(request.model)
     if model_info and model_info.is_video:
-        from app.services.grok.media import VideoService
+        from app.services.grok.services.media import VideoService
 
         # 提取视频配置 (默认值在 Pydantic 模型中处理)
         v_conf = request.video_config or VideoConfig()
