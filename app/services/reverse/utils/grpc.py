@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from typing import Dict, List, Mapping, Optional, Tuple
 from urllib.parse import unquote
 
+# Base64 正则
+B64_RE = re.compile(rb"^[A-Za-z0-9+/=\r\n]+$")
+
 
 @dataclass(frozen=True)
 class GrpcStatus:
@@ -48,7 +51,7 @@ class GrpcClient:
             return base64.b64decode(compact, validate=False)
 
         head = body[: min(len(body), 2048)]
-        if head and re.compile(rb"^[A-Za-z0-9+/=\r\n]+$").fullmatch(head):
+        if head and B64_RE.fullmatch(head):
             compact = b"".join(body.split())
             try:
                 return base64.b64decode(compact, validate=True)

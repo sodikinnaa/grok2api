@@ -123,10 +123,11 @@ def build_headers(cookie_token: str, content_type: Optional[str] = None, origin:
     headers["x-xai-request-id"] = str(uuid.uuid4())
 
     # Print headers without Cookie
-    safe_headers = dict(headers)
-    if "Cookie" in safe_headers:
-        safe_headers["Cookie"] = "<redacted>"
-    logger.debug(f"Built headers: {orjson.dumps(safe_headers).decode()}")
+    if logger.isEnabledFor(10):
+        safe_headers = dict(headers)
+        if "Cookie" in safe_headers:
+            safe_headers["Cookie"] = "<redacted>"
+        logger.debug(f"Built headers: {orjson.dumps(safe_headers).decode()}")
 
     return headers
 
