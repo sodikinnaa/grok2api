@@ -260,7 +260,7 @@ async def chat_completions(request: ChatCompletionRequest):
     # 检测视频模型
     model_info = ModelService.get(request.model)
     if model_info and model_info.is_video:
-        from app.services.grok.services.media import VideoService
+        from app.services.grok.services.video import VideoService
 
         # 提取视频配置 (默认值在 Pydantic 模型中处理)
         v_conf = request.video_config or VideoConfig()

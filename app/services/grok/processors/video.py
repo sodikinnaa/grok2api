@@ -1,5 +1,5 @@
 """
-视频响应处理器
+Video response processors.
 """
 
 import asyncio
@@ -22,7 +22,7 @@ from .base import (
 
 
 class VideoStreamProcessor(BaseProcessor):
-    """视频流式响应处理器"""
+    """Video stream response processor."""
 
     def __init__(self, model: str, token: str = "", think: bool = None):
         super().__init__(model, token)
@@ -37,7 +37,7 @@ class VideoStreamProcessor(BaseProcessor):
             self.show_think = think
 
     def _sse(self, content: str = "", role: str = None, finish: str = None) -> str:
-        """构建 SSE 响应"""
+        """Build SSE response."""
         delta = {}
         if role:
             delta["role"] = role
@@ -57,7 +57,7 @@ class VideoStreamProcessor(BaseProcessor):
         return f"data: {orjson.dumps(chunk).decode()}\n\n"
 
     def _build_video_html(self, video_url: str, thumbnail_url: str = "") -> str:
-        """构建视频 HTML 标签"""
+        """Build video HTML tag."""
         import html
 
         safe_video_url = html.escape(video_url)
@@ -70,7 +70,7 @@ class VideoStreamProcessor(BaseProcessor):
     async def process(
         self, response: AsyncIterable[bytes]
     ) -> AsyncGenerator[str, None]:
-        """处理视频流式响应"""
+        """Process video stream response."""
         idle_timeout = get_config("timeout.video_idle_timeout")
 
         try:
@@ -92,7 +92,7 @@ class VideoStreamProcessor(BaseProcessor):
                     yield self._sse(role="assistant")
                     self.role_sent = True
 
-                # 视频生成进度
+                # Video generation progress
                 if video_resp := resp.get("streamingVideoGenerationResponse"):
                     progress = video_resp.get("progress", 0)
 
@@ -175,7 +175,7 @@ class VideoStreamProcessor(BaseProcessor):
 
 
 class VideoCollectProcessor(BaseProcessor):
-    """视频非流式响应处理器"""
+    """Video non-stream response processor."""
 
     def __init__(self, model: str, token: str = ""):
         super().__init__(model, token)
@@ -188,7 +188,7 @@ class VideoCollectProcessor(BaseProcessor):
 </video>'''
 
     async def process(self, response: AsyncIterable[bytes]) -> dict[str, Any]:
-        """处理并收集视频响应"""
+        """Process and collect video response."""
         response_id = ""
         content = ""
         idle_timeout = get_config("timeout.video_idle_timeout")

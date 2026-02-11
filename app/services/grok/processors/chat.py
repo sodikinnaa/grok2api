@@ -1,5 +1,5 @@
 """
-聊天响应处理器
+Chat response processors.
 """
 
 import asyncio
@@ -24,7 +24,7 @@ from .base import (
 
 
 class StreamProcessor(BaseProcessor):
-    """流式响应处理器"""
+    """Stream response processor."""
 
     def __init__(self, model: str, token: str = "", think: bool = None):
         super().__init__(model, token)
@@ -43,7 +43,7 @@ class StreamProcessor(BaseProcessor):
             self.show_think = think
 
     def _filter_token(self, token: str) -> str:
-        """过滤 token 中的特殊标签（如 <grok:render>...</grok:render>），支持跨 token 的标签过滤"""
+        """Filter special tags (supports cross-token tag filtering)."""
         if not self.filter_tags:
             return token
 
@@ -92,7 +92,7 @@ class StreamProcessor(BaseProcessor):
         return "".join(result)
 
     def _sse(self, content: str = "", role: str = None, finish: str = None) -> str:
-        """构建 SSE 响应"""
+        """Build SSE response."""
         delta = {}
         if role:
             delta["role"] = role
@@ -115,7 +115,7 @@ class StreamProcessor(BaseProcessor):
     async def process(
         self, response: AsyncIterable[bytes]
     ) -> AsyncGenerator[str, None]:
-        """处理流式响应"""
+        """Process stream response."""
         idle_timeout = get_config("timeout.stream_idle_timeout")
 
         try:
@@ -139,7 +139,7 @@ class StreamProcessor(BaseProcessor):
                     yield self._sse(role="assistant")
                     self.role_sent = True
 
-                # 图像生成进度
+                # Image generation progress
                 if img := resp.get("streamingImageGenerationResponse"):
                     if self.show_think:
                         if not self.think_opened:
@@ -160,7 +160,7 @@ class StreamProcessor(BaseProcessor):
                         yield self._sse("</think>\n")
                         self.think_opened = False
 
-                    # 处理生成的图片
+                    # Handle generated images
                     for url in _collect_image_urls(mr):
                         parts = url.split("/")
                         img_id = parts[-2] if len(parts) >= 2 else "image"
@@ -194,7 +194,7 @@ class StreamProcessor(BaseProcessor):
                         self.fingerprint = meta["llm_info"]["modelHash"]
                     continue
 
-                # 普通 token
+                # Normal token
                 if (token := resp.get("token")) is not None:
                     if token:
                         filtered = self._filter_token(token)
@@ -242,7 +242,7 @@ class StreamProcessor(BaseProcessor):
 
 
 class CollectProcessor(BaseProcessor):
-    """非流式响应处理器"""
+    """Non-stream response processor."""
 
     def __init__(self, model: str, token: str = ""):
         super().__init__(model, token)
@@ -250,7 +250,7 @@ class CollectProcessor(BaseProcessor):
         self.filter_tags = get_config("chat.filter_tags")
 
     def _filter_content(self, content: str) -> str:
-        """过滤内容中的特殊标签"""
+        """Filter special tags in content."""
         if not content or not self.filter_tags:
             return content
 
@@ -262,7 +262,7 @@ class CollectProcessor(BaseProcessor):
         return result
 
     async def process(self, response: AsyncIterable[bytes]) -> dict[str, Any]:
-        """处理并收集完整响应"""
+        """Process and collect full response."""
         response_id = ""
         fingerprint = ""
         content = ""

@@ -16,7 +16,11 @@ from app.core.batch_tasks import create_task, get_task, expire_task
 from app.core.storage import get_storage, LocalStorage, RedisStorage, SQLStorage
 from app.core.exceptions import AppException
 from app.services.token.manager import get_token_manager
-from app.services.grok.utils.batch import run_in_batches
+from app.services.grok.batch_services import (
+    BatchUsageService,
+    BatchNSFWService,
+    BatchAssetsService,
+)
 import os
 import time
 import uuid
@@ -27,10 +31,8 @@ import orjson
 from app.core.logger import logger
 from app.api.v1.image import resolve_aspect_ratio
 from app.services.grok.services.voice import VoiceService
-from app.services.grok.services.image import image_service
+from app.services.grok.services.image import ImageGenerationService
 from app.services.grok.models.model import ModelService
-from app.services.grok.processors.image_ws_processors import ImageWSCollectProcessor
-from app.services.token import EffortType
 
 TEMPLATE_DIR = Path(__file__).parent.parent.parent / "static"
 
@@ -363,7 +365,6 @@ async def admin_imagine_ws(websocket: WebSocket):
             return
 
         token_mgr = await get_token_manager()
-        enable_nsfw = bool(get_config("image.image_ws_nsfw", True))
         sequence = 0
         run_id = uuid.uuid4().hex
 
@@ -399,26 +400,23 @@ async def admin_imagine_ws(websocket: WebSocket):
                     await asyncio.sleep(2)
                     continue
 
-                upstream = image_service.stream(
+                start_at = time.time()
+                result = await ImageGenerationService().generate(
+                    token_mgr=token_mgr,
                     token=token,
+                    model_info=model_info,
                     prompt=prompt,
-                    aspect_ratio=aspect_ratio,
-                    n=6,
-                    enable_nsfw=enable_nsfw,
-                )
-
-                processor = ImageWSCollectProcessor(
-                    model_info.model_id,
-                    token,
                     n=6,
                     response_format="b64_json",
+                    size="1024x1024",
+                    aspect_ratio=aspect_ratio,
+                    stream=False,
+                    use_ws=True,
                 )
-
-                start_at = time.time()
-                images = await processor.process(upstream)
                 elapsed_ms = int((time.time() - start_at) * 1000)
 
-                if images and all(img and img != "error" for img in images):
+                images = [img for img in result.data if img and img != "error"]
+                if images:
                     # 一次发送所有 6 张图片
                     for img_b64 in images:
                         sequence += 1
@@ -433,17 +431,6 @@ async def admin_imagine_ws(websocket: WebSocket):
                                 "run_id": run_id,
                             }
                         )
-
-                    # 消耗 token（6 张图片按高成本计算）
-                    try:
-                        effort = (
-                            EffortType.HIGH
-                            if (model_info and model_info.cost.value == "high")
-                            else EffortType.LOW
-                        )
-                        await token_mgr.consume(token, effort)
-                    except Exception as e:
-                        logger.warning(f"Failed to consume token: {e}")
                 else:
                     await _send(
                         {
@@ -602,7 +589,6 @@ async def admin_imagine_sse(
                 return
 
             token_mgr = await get_token_manager()
-            enable_nsfw = bool(get_config("image.image_ws_nsfw", True))
             sequence = 0
             run_id = uuid.uuid4().hex
 
@@ -645,26 +631,23 @@ async def admin_imagine_sse(
                         await asyncio.sleep(2)
                         continue
 
-                    upstream = image_service.stream(
+                    start_at = time.time()
+                    result = await ImageGenerationService().generate(
+                        token_mgr=token_mgr,
                         token=token,
+                        model_info=model_info,
                         prompt=prompt,
-                        aspect_ratio=ratio,
-                        n=6,
-                        enable_nsfw=enable_nsfw,
-                    )
-
-                    processor = ImageWSCollectProcessor(
-                        model_info.model_id,
-                        token,
                         n=6,
                         response_format="b64_json",
+                        size="1024x1024",
+                        aspect_ratio=ratio,
+                        stream=False,
+                        use_ws=True,
                     )
-
-                    start_at = time.time()
-                    images = await processor.process(upstream)
                     elapsed_ms = int((time.time() - start_at) * 1000)
 
-                    if images and all(img and img != "error" for img in images):
+                    images = [img for img in result.data if img and img != "error"]
+                    if images:
                         for img_b64 in images:
                             sequence += 1
                             yield _sse_event(
@@ -678,16 +661,6 @@ async def admin_imagine_sse(
                                     "run_id": run_id,
                                 }
                             )
-
-                        try:
-                            effort = (
-                                EffortType.HIGH
-                                if (model_info and model_info.cost.value == "high")
-                                else EffortType.LOW
-                            )
-                            await token_mgr.consume(token, effort)
-                        except Exception as e:
-                            logger.warning(f"Failed to consume token: {e}")
                     else:
                         yield _sse_event(
                             {
@@ -863,12 +836,9 @@ async def refresh_tokens_api(data: dict):
         max_concurrent = get_config("performance.usage_max_concurrent")
         batch_size = get_config("performance.usage_batch_size")
 
-        async def _refresh_one(t):
-            return await mgr.sync_usage(t, consume_on_fail=False, is_usage=False)
-
-        raw_results = await run_in_batches(
+        raw_results = await BatchUsageService.refresh(
             unique_tokens,
-            _refresh_one,
+            mgr,
             max_concurrent=max_concurrent,
             batch_size=batch_size,
         )
@@ -915,15 +885,12 @@ async def refresh_tokens_api_async(data: dict):
     async def _run():
         try:
 
-            async def _refresh_one(t: str):
-                return await mgr.sync_usage(t, consume_on_fail=False, is_usage=False)
-
             async def _on_item(item: str, res: dict):
                 task.record(bool(res.get("ok")))
 
-            raw_results = await run_in_batches(
+            raw_results = await BatchUsageService.refresh(
                 unique_tokens,
-                _refresh_one,
+                mgr,
                 max_concurrent=max_concurrent,
                 batch_size=batch_size,
                 on_item=_on_item,
@@ -979,11 +946,8 @@ async def refresh_tokens_api_async(data: dict):
 @router.post("/api/v1/admin/tokens/nsfw/enable", dependencies=[Depends(verify_api_key)])
 async def enable_nsfw_api(data: dict):
     """批量开启 NSFW (Unhinged) 模式"""
-    from app.services.grok.services.nsfw import NSFWService
-
     try:
         mgr = await get_token_manager()
-        nsfw_service = NSFWService()
 
         # 收集 token 列表
         tokens = _collect_tokens(data)
@@ -1010,23 +974,11 @@ async def enable_nsfw_api(data: dict):
         max_concurrent = get_config("performance.nsfw_max_concurrent")
         batch_size = get_config("performance.nsfw_batch_size")
 
-        # 定义 worker
-        async def _enable(token: str):
-            result = await nsfw_service.enable(token)
-            # 成功后添加 nsfw tag
-            if result.success:
-                await mgr.add_tag(token, "nsfw")
-            return {
-                "success": result.success,
-                "http_status": result.http_status,
-                "grpc_status": result.grpc_status,
-                "grpc_message": result.grpc_message,
-                "error": result.error,
-            }
-
-        # 执行批量操作
-        raw_results = await run_in_batches(
-            unique_tokens, _enable, max_concurrent=max_concurrent, batch_size=batch_size
+        raw_results = await BatchNSFWService.enable(
+            unique_tokens,
+            mgr,
+            max_concurrent=max_concurrent,
+            batch_size=batch_size,
         )
 
         # 构造返回结果（mask token）
@@ -1073,10 +1025,7 @@ async def enable_nsfw_api(data: dict):
 )
 async def enable_nsfw_api_async(data: dict):
     """批量开启 NSFW (Unhinged) 模式（异步批量 + SSE 进度）"""
-    from app.services.grok.services.nsfw import NSFWService
-
     mgr = await get_token_manager()
-    nsfw_service = NSFWService()
 
     tokens = _collect_tokens(data)
 
@@ -1103,25 +1052,13 @@ async def enable_nsfw_api_async(data: dict):
     async def _run():
         try:
 
-            async def _enable(token: str):
-                result = await nsfw_service.enable(token)
-                if result.success:
-                    await mgr.add_tag(token, "nsfw")
-                return {
-                    "success": result.success,
-                    "http_status": result.http_status,
-                    "grpc_status": result.grpc_status,
-                    "grpc_message": result.grpc_message,
-                    "error": result.error,
-                }
-
             async def _on_item(item: str, res: dict):
                 ok = bool(res.get("ok") and res.get("data", {}).get("success"))
                 task.record(ok)
 
-            raw_results = await run_in_batches(
+            raw_results = await BatchNSFWService.enable(
                 unique_tokens,
-                _enable,
+                mgr,
                 max_concurrent=max_concurrent,
                 batch_size=batch_size,
                 on_item=_on_item,
@@ -1184,9 +1121,8 @@ async def admin_cache_page():
 @router.get("/api/v1/admin/cache", dependencies=[Depends(verify_api_key)])
 async def get_cache_stats_api(request: Request):
     """获取缓存统计"""
-    from app.services.grok.services.assets import DownloadService, ListService
+    from app.services.grok.utils.download import DownloadService
     from app.services.token.manager import get_token_manager
-    from app.services.grok.utils.batch import run_in_batches
 
     try:
         dl_service = DownloadService()
@@ -1238,51 +1174,14 @@ async def get_cache_stats_api(request: Request):
         truncated = False
         original_count = 0
 
-        async def _fetch_assets(token: str):
-            list_service = ListService()
-            try:
-                return await list_service.count(token)
-            finally:
-                await list_service.close()
-
-        async def _fetch_detail(token: str):
-            account = account_map.get(token)
-            try:
-                count = await _fetch_assets(token)
-                return {
-                    "detail": {
-                        "token": token,
-                        "token_masked": account["token_masked"] if account else token,
-                        "count": count,
-                        "status": "ok",
-                        "last_asset_clear_at": account["last_asset_clear_at"]
-                        if account
-                        else None,
-                    },
-                    "count": count,
-                }
-            except Exception as e:
-                return {
-                    "detail": {
-                        "token": token,
-                        "token_masked": account["token_masked"] if account else token,
-                        "count": 0,
-                        "status": f"error: {str(e)}",
-                        "last_asset_clear_at": account["last_asset_clear_at"]
-                        if account
-                        else None,
-                    },
-                    "count": 0,
-                }
-
         if selected_tokens:
             selected_tokens, truncated, original_count = _truncate_tokens(
                 selected_tokens, max_tokens, "Assets fetch"
             )
             total = 0
-            raw_results = await run_in_batches(
+            raw_results = await BatchAssetsService.fetch_details(
                 selected_tokens,
-                _fetch_detail,
+                account_map,
                 max_concurrent=max_concurrent,
                 batch_size=batch_size,
             )
@@ -1318,9 +1217,9 @@ async def get_cache_stats_api(request: Request):
             if len(tokens) > max_tokens:
                 tokens = tokens[:max_tokens]
                 truncated = True
-            raw_results = await run_in_batches(
+            raw_results = await BatchAssetsService.fetch_details(
                 tokens,
-                _fetch_detail,
+                account_map,
                 max_concurrent=max_concurrent,
                 batch_size=batch_size,
             )
@@ -1351,23 +1250,28 @@ async def get_cache_stats_api(request: Request):
         else:
             token = selected_token
             if token:
-                try:
-                    count = await _fetch_assets(token)
-                    match = next((a for a in accounts if a["token"] == token), None)
+                raw_results = await BatchAssetsService.fetch_details(
+                    [token],
+                    account_map,
+                    max_concurrent=1,
+                    batch_size=1,
+                )
+                res = raw_results.get(token, {})
+                data = res.get("data", {})
+                detail = data.get("detail") if res.get("ok") else None
+                if detail:
                     online_stats = {
-                        "count": count,
-                        "status": "ok",
-                        "token": token,
-                        "token_masked": match["token_masked"] if match else token,
-                        "last_asset_clear_at": match["last_asset_clear_at"]
-                        if match
-                        else None,
+                        "count": data.get("count", 0),
+                        "status": detail.get("status", "ok"),
+                        "token": detail.get("token"),
+                        "token_masked": detail.get("token_masked"),
+                        "last_asset_clear_at": detail.get("last_asset_clear_at"),
                     }
-                except Exception as e:
+                else:
                     match = next((a for a in accounts if a["token"] == token), None)
                     online_stats = {
                         "count": 0,
-                        "status": f"error: {str(e)}",
+                        "status": f"error: {res.get('error')}",
                         "token": token,
                         "token_masked": match["token_masked"] if match else token,
                         "last_asset_clear_at": match["last_asset_clear_at"]
@@ -1404,9 +1308,8 @@ async def get_cache_stats_api(request: Request):
 )
 async def load_online_cache_api_async(data: dict):
     """在线资产统计（异步批量 + SSE 进度）"""
-    from app.services.grok.services.assets import DownloadService, ListService
+    from app.services.grok.utils.download import DownloadService
     from app.services.token.manager import get_token_manager
-    from app.services.grok.utils.batch import run_in_batches
 
     mgr = await get_token_manager()
 
@@ -1462,44 +1365,16 @@ async def load_online_cache_api_async(data: dict):
             image_stats = dl_service.get_stats("image")
             video_stats = dl_service.get_stats("video")
 
-            async def _fetch_detail(token: str):
-                account = account_map.get(token)
-                list_service = ListService()
-                try:
-                    count = await list_service.count(token)
-                    detail = {
-                        "token": token,
-                        "token_masked": account["token_masked"] if account else token,
-                        "count": count,
-                        "status": "ok",
-                        "last_asset_clear_at": account["last_asset_clear_at"]
-                        if account
-                        else None,
-                    }
-                    return {"ok": True, "detail": detail, "count": count}
-                except Exception as e:
-                    detail = {
-                        "token": token,
-                        "token_masked": account["token_masked"] if account else token,
-                        "count": 0,
-                        "status": f"error: {str(e)}",
-                        "last_asset_clear_at": account["last_asset_clear_at"]
-                        if account
-                        else None,
-                    }
-                    return {"ok": False, "detail": detail, "count": 0}
-                finally:
-                    await list_service.close()
-
             async def _on_item(item: str, res: dict):
                 ok = bool(res.get("data", {}).get("ok"))
                 task.record(ok)
 
-            raw_results = await run_in_batches(
+            raw_results = await BatchAssetsService.fetch_details(
                 selected_tokens,
-                _fetch_detail,
+                account_map,
                 max_concurrent=max_concurrent,
                 batch_size=batch_size,
+                include_ok=True,
                 on_item=_on_item,
                 should_cancel=lambda: task.cancelled,
             )
@@ -1555,7 +1430,7 @@ async def load_online_cache_api_async(data: dict):
 @router.post("/api/v1/admin/cache/clear", dependencies=[Depends(verify_api_key)])
 async def clear_local_cache_api(data: dict):
     """清理本地缓存"""
-    from app.services.grok.services.assets import DownloadService
+    from app.services.grok.utils.download import DownloadService
 
     cache_type = data.get("type", "image")
 
@@ -1575,7 +1450,7 @@ async def list_local_cache_api(
     page_size: int = 1000,
 ):
     """列出本地缓存文件"""
-    from app.services.grok.services.assets import DownloadService
+    from app.services.grok.utils.download import DownloadService
 
     try:
         if type_:
@@ -1590,7 +1465,7 @@ async def list_local_cache_api(
 @router.post("/api/v1/admin/cache/item/delete", dependencies=[Depends(verify_api_key)])
 async def delete_local_cache_item_api(data: dict):
     """删除单个本地缓存文件"""
-    from app.services.grok.services.assets import DownloadService
+    from app.services.grok.utils.download import DownloadService
 
     cache_type = data.get("type", "image")
     name = data.get("name")
@@ -1607,15 +1482,10 @@ async def delete_local_cache_item_api(data: dict):
 @router.post("/api/v1/admin/cache/online/clear", dependencies=[Depends(verify_api_key)])
 async def clear_online_cache_api(data: dict):
     """清理在线缓存"""
-    from app.services.grok.services.assets import DeleteService
     from app.services.token.manager import get_token_manager
-    from app.services.grok.utils.batch import run_in_batches
-
-    delete_service = None
     try:
         mgr = await get_token_manager()
         tokens = data.get("tokens")
-        delete_service = DeleteService()
 
         if isinstance(tokens, list):
             token_list = [t.strip() for t in tokens if isinstance(t, str) and t.strip()]
@@ -1637,17 +1507,9 @@ async def clear_online_cache_api(data: dict):
             )
             batch_size = max(1, int(get_config("performance.assets_batch_size")))
 
-            async def _clear_one(t: str):
-                try:
-                    result = await delete_service.delete_all(t)
-                    await mgr.mark_asset_clear(t)
-                    return {"status": "success", "result": result}
-                except Exception as e:
-                    return {"status": "error", "error": str(e)}
-
-            raw_results = await run_in_batches(
+            raw_results = await BatchAssetsService.clear_online(
                 token_list,
-                _clear_one,
+                mgr,
                 max_concurrent=max_concurrent,
                 batch_size=batch_size,
             )
@@ -1670,14 +1532,19 @@ async def clear_online_cache_api(data: dict):
                 status_code=400, detail="No available token to perform cleanup"
             )
 
-        result = await delete_service.delete_all(token)
-        await mgr.mark_asset_clear(token)
-        return {"status": "success", "result": result}
+        raw_results = await BatchAssetsService.clear_online(
+            [token],
+            mgr,
+            max_concurrent=1,
+            batch_size=1,
+        )
+        res = raw_results.get(token, {})
+        data = res.get("data", {})
+        if res.get("ok") and data.get("status") == "success":
+            return {"status": "success", "result": data.get("result")}
+        return {"status": "error", "error": data.get("error") or res.get("error")}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if delete_service:
-            await delete_service.close()
 
 
 @router.post(
@@ -1685,9 +1552,7 @@ async def clear_online_cache_api(data: dict):
 )
 async def clear_online_cache_api_async(data: dict):
     """清理在线缓存（异步批量 + SSE 进度）"""
-    from app.services.grok.services.assets import DeleteService
     from app.services.token.manager import get_token_manager
-    from app.services.grok.utils.batch import run_in_batches
 
     mgr = await get_token_manager()
     tokens = data.get("tokens")
@@ -1709,26 +1574,17 @@ async def clear_online_cache_api_async(data: dict):
     task = create_task(len(token_list))
 
     async def _run():
-        delete_service = DeleteService()
         try:
-
-            async def _clear_one(t: str):
-                try:
-                    result = await delete_service.delete_all(t)
-                    await mgr.mark_asset_clear(t)
-                    return {"ok": True, "result": result}
-                except Exception as e:
-                    return {"ok": False, "error": str(e)}
-
             async def _on_item(item: str, res: dict):
                 ok = bool(res.get("data", {}).get("ok"))
                 task.record(ok)
 
-            raw_results = await run_in_batches(
+            raw_results = await BatchAssetsService.clear_online(
                 token_list,
-                _clear_one,
+                mgr,
                 max_concurrent=max_concurrent,
                 batch_size=batch_size,
+                include_ok=True,
                 on_item=_on_item,
                 should_cancel=lambda: task.cancelled,
             )
@@ -1767,7 +1623,6 @@ async def clear_online_cache_api_async(data: dict):
         except Exception as e:
             task.fail_task(str(e))
         finally:
-            await delete_service.close()
             asyncio.create_task(expire_task(task.id, 300))
 
     asyncio.create_task(_run())

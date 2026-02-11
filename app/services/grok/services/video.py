@@ -1,5 +1,5 @@
 """
-Grok 视频生成服务
+Grok video generation service.
 """
 
 import asyncio
@@ -25,7 +25,7 @@ _MEDIA_SEM_VALUE = 0
 
 
 def _get_semaphore() -> asyncio.Semaphore:
-    """获取或更新信号量"""
+    """Get or refresh the semaphore."""
     global _MEDIA_SEMAPHORE, _MEDIA_SEM_VALUE
     value = max(1, int(get_config("performance.media_max_concurrent")))
     if value != _MEDIA_SEM_VALUE:
@@ -35,7 +35,7 @@ def _get_semaphore() -> asyncio.Semaphore:
 
 
 class VideoService:
-    """视频生成服务"""
+    """Video generation service."""
 
     def __init__(self):
         self.timeout = get_config("network.timeout")
@@ -47,7 +47,7 @@ class VideoService:
         media_type: str = "MEDIA_POST_TYPE_VIDEO",
         media_url: str = None,
     ) -> str:
-        """创建媒体帖子，返回 post ID"""
+        """Create media post and return post ID."""
         try:
             if media_type == "MEDIA_POST_TYPE_IMAGE" and not media_url:
                 raise ValidationException("media_url is required for image posts")
@@ -74,7 +74,7 @@ class VideoService:
             raise UpstreamException(f"Create post error: {str(e)}")
 
     async def create_image_post(self, token: str, image_url: str) -> str:
-        """创建图片帖子，返回 post ID"""
+        """Create image post and return post ID."""
         return await self.create_post(
             token, prompt="", media_type="MEDIA_POST_TYPE_IMAGE", media_url=image_url
         )
@@ -88,7 +88,7 @@ class VideoService:
         resolution_name: str = "480p",
         preset: str = "normal",
     ) -> dict:
-        """构建视频生成载荷"""
+        """Build video generation payload."""
         mode_map = {
             "fun": "--mode=extremely-crazy",
             "normal": "--mode=normal",
@@ -139,7 +139,7 @@ class VideoService:
         resolution_name: str,
         preset: str,
     ) -> AsyncGenerator[bytes, None]:
-        """内部生成逻辑"""
+        """Internal generation logic."""
         session = None
         try:
             payload = self._build_payload(
@@ -182,7 +182,7 @@ class VideoService:
         resolution_name: str = "480p",
         preset: str = "normal",
     ) -> AsyncGenerator[bytes, None]:
-        """生成视频"""
+        """Generate video."""
         logger.info(
             f"Video generation: prompt='{prompt[:50]}...', ratio={aspect_ratio}, length={video_length}s, preset={preset}"
         )
@@ -208,7 +208,7 @@ class VideoService:
         resolution: str = "480p",
         preset: str = "normal",
     ) -> AsyncGenerator[bytes, None]:
-        """从图片生成视频"""
+        """Generate video from image."""
         logger.info(
             f"Image to video: prompt='{prompt[:50]}...', image={image_url[:80]}"
         )
@@ -229,12 +229,12 @@ class VideoService:
         resolution: str = "480p",
         preset: str = "normal",
     ):
-        """视频生成入口"""
-        # 获取 token（使用智能路由）
+        """Video generation entrypoint."""
+        # Get token via intelligent routing.
         token_mgr = await get_token_manager()
         await token_mgr.reload_if_stale()
 
-        # 使用智能路由选择 token（根据视频需求与候选池）
+        # Select token based on video requirements and pool candidates.
         pool_candidates = ModelService.pool_candidates_for_model(model)
         token_info = token_mgr.get_token_for_video(
             resolution=resolution,
@@ -250,7 +250,7 @@ class VideoService:
                 status_code=429,
             )
 
-        # 从 TokenInfo 对象中提取 token 字符串
+        # Extract token string from TokenInfo.
         token = token_info.token
         if token.startswith("sso="):
             token = token[4:]
@@ -258,7 +258,7 @@ class VideoService:
         think = {"enabled": True, "disabled": False}.get(thinking)
         is_stream = stream if stream is not None else get_config("chat.stream")
 
-        # 提取内容
+        # Extract content.
         from app.services.grok.services.chat import MessageExtractor
         from app.services.grok.services.assets import UploadService
 
@@ -267,7 +267,7 @@ class VideoService:
         except ValueError as e:
             raise ValidationException(str(e))
 
-        # 处理图片附件
+        # Handle image attachments.
         image_url = None
         if attachments:
             upload_service = UploadService()
@@ -281,7 +281,7 @@ class VideoService:
             finally:
                 await upload_service.close()
 
-        # 生成视频
+        # Generate video.
         service = VideoService()
         if image_url:
             response = await service.generate_from_image(
@@ -292,7 +292,7 @@ class VideoService:
                 token, prompt, aspect_ratio, video_length, resolution, preset
             )
 
-        # 处理响应
+        # Process response.
         if is_stream:
             processor = VideoStreamProcessor(model, token, think)
             return wrap_stream_with_usage(

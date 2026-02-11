@@ -8,7 +8,7 @@ from typing import Any, AsyncGenerator, Optional, AsyncIterable, List, TypeVar
 
 from app.core.config import get_config
 from app.core.logger import logger
-from app.services.grok.services.assets import DownloadService
+from app.services.grok.utils.download import DownloadService
 
 
 ASSET_URL = "https://assets.grok.com/"
