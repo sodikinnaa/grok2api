@@ -16,7 +16,7 @@ from app.core.exceptions import (
     UpstreamException,
 )
 from app.services.grok.models.model import ModelService
-from app.services.grok.services.assets import UploadService
+from app.services.grok.utils.upload import UploadService
 from app.services.grok.processors import StreamProcessor, CollectProcessor
 from app.services.reverse import AppChatReverse
 from app.services.grok.utils.stream import wrap_stream_with_usage
@@ -209,7 +209,7 @@ class GrokChatService:
             upload_service = UploadService()
             try:
                 for attach_type, attach_data in attachments:
-                    file_id, _ = await upload_service.upload(attach_data, token)
+                    file_id, _ = await upload_service.upload_file(attach_data, token)
                     file_ids.append(file_id)
                     logger.debug(
                         f"Attachment uploaded: type={attach_type}, file_id={file_id}"

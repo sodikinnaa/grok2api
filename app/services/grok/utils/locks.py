@@ -1,0 +1,71 @@
+"""
+Shared locking helpers for assets operations.
+"""
+
+import asyncio
+import time
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from app.core.config import get_config
+from app.core.storage import DATA_DIR
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
+
+LOCK_DIR = DATA_DIR / ".locks"
+
+_ASSETS_SEMAPHORE = None
+_ASSETS_SEM_VALUE = None
+
+
+def _get_assets_semaphore() -> asyncio.Semaphore:
+    """Return global semaphore for assets operations."""
+    value = max(1, int(get_config("performance.assets_max_concurrent")))
+
+    global _ASSETS_SEMAPHORE, _ASSETS_SEM_VALUE
+    if _ASSETS_SEMAPHORE is None or value != _ASSETS_SEM_VALUE:
+        _ASSETS_SEM_VALUE = value
+        _ASSETS_SEMAPHORE = asyncio.Semaphore(value)
+    return _ASSETS_SEMAPHORE
+
+
+@asynccontextmanager
+async def _file_lock(name: str, timeout: int = 10):
+    """File lock guard."""
+    if fcntl is None:
+        yield
+        return
+
+    LOCK_DIR.mkdir(parents=True, exist_ok=True)
+    lock_path = Path(LOCK_DIR) / f"{name}.lock"
+    fd = None
+    locked = False
+    start = time.monotonic()
+
+    try:
+        fd = open(lock_path, "a+")
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                locked = True
+                break
+            except BlockingIOError:
+                if time.monotonic() - start >= timeout:
+                    break
+                await asyncio.sleep(0.05)
+        yield
+    finally:
+        if fd:
+            if locked:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                except Exception:
+                    pass
+            fd.close()
+
+
+__all__ = ["_get_assets_semaphore", "_file_lock"]

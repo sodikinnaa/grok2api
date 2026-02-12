@@ -14,9 +14,10 @@ from app.services.token.models import (
     BASIC__DEFAULT_QUOTA,
     SUPER_DEFAULT_QUOTA,
 )
-from app.core.storage import get_storage
+from app.core.storage import get_storage, LocalStorage
 from app.core.config import get_config
 from app.services.token.pool import TokenPool
+from app.services.grok.batch_services.usage import UsageService
 
 
 DEFAULT_REFRESH_BATCH_SIZE = 10
@@ -70,8 +71,6 @@ class TokenManager:
 
                 # 如果后端返回 None 或空数据，尝试从本地 data/token.json 初始化后端
                 if not data:
-                    from app.core.storage import LocalStorage
-
                     local_storage = LocalStorage()
                     local_data = await local_storage.load_tokens()
                     if local_data:
@@ -363,8 +362,6 @@ class TokenManager:
 
         # 尝试 API 同步
         try:
-            from app.services.grok.services.usage import UsageService
-
             usage_service = UsageService()
             result = await usage_service.get(token_str)
 
@@ -634,8 +631,6 @@ class TokenManager:
         Returns:
             {"checked": int, "refreshed": int, "recovered": int, "expired": int}
         """
-        from app.services.grok.services.usage import UsageService
-
         # 收集需要刷新的 token
         to_refresh: List[TokenInfo] = []
         for pool in self.pools.values():
@@ -676,7 +671,7 @@ class TokenManager:
                 # 重试逻辑：最多 2 次重试
                 for retry in range(3):  # 0, 1, 2
                     try:
-                        result = await usage_service.get(token_str, model_name="grok-3")
+                        result = await usage_service.get(token_str)
 
                         if result and "remainingTokens" in result:
                             new_quota = result["remainingTokens"]

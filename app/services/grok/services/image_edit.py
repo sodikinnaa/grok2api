@@ -11,7 +11,7 @@ from typing import AsyncGenerator, List, Union, Any
 from app.core.exceptions import AppException, ErrorType
 from app.core.logger import logger
 from app.services.grok.processors import ImageCollectProcessor, ImageStreamProcessor
-from app.services.grok.services.assets import UploadService
+from app.services.grok.utils.upload import UploadService
 from app.services.grok.services.chat import GrokChatService
 from app.services.grok.services.video import VideoService
 from app.services.grok.utils.stream import wrap_stream_with_usage
@@ -98,7 +98,7 @@ class ImageEditService:
         upload_service = UploadService()
         try:
             for image in images:
-                _, file_uri = await upload_service.upload(image, token)
+                _, file_uri = await upload_service.upload_file(image, token)
                 if file_uri:
                     if file_uri.startswith("http"):
                         image_urls.append(file_uri)

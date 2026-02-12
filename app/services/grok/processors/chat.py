@@ -168,7 +168,7 @@ class StreamProcessor(BaseProcessor):
                         if self.image_format == "base64":
                             try:
                                 dl_service = self._get_dl()
-                                base64_data = await dl_service.to_base64(
+                                base64_data = await dl_service.parse_b64(
                                     url, self.token, "image"
                                 )
                                 if base64_data:
@@ -296,7 +296,7 @@ class CollectProcessor(BaseProcessor):
                             if self.image_format == "base64":
                                 try:
                                     dl_service = self._get_dl()
-                                    base64_data = await dl_service.to_base64(
+                                    base64_data = await dl_service.parse_b64(
                                         url, self.token, "image"
                                     )
                                     if base64_data:

@@ -99,7 +99,7 @@ class ImageStreamProcessor(BaseProcessor):
                                 continue
                             try:
                                 dl_service = self._get_dl()
-                                base64_data = await dl_service.to_base64(
+                                base64_data = await dl_service.parse_b64(
                                     url, self.token, "image"
                                 )
                                 if base64_data:
@@ -212,7 +212,7 @@ class ImageCollectProcessor(BaseProcessor):
                                 continue
                             try:
                                 dl_service = self._get_dl()
-                                base64_data = await dl_service.to_base64(
+                                base64_data = await dl_service.parse_b64(
                                     url, self.token, "image"
                                 )
                                 if base64_data:

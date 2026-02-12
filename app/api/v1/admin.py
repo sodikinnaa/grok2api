@@ -1121,13 +1121,13 @@ async def admin_cache_page():
 @router.get("/api/v1/admin/cache", dependencies=[Depends(verify_api_key)])
 async def get_cache_stats_api(request: Request):
     """获取缓存统计"""
-    from app.services.grok.utils.download import DownloadService
+    from app.services.grok.utils.cache import CacheService
     from app.services.token.manager import get_token_manager
 
     try:
-        dl_service = DownloadService()
-        image_stats = dl_service.get_stats("image")
-        video_stats = dl_service.get_stats("video")
+        cache_service = CacheService()
+        image_stats = cache_service.get_stats("image")
+        video_stats = cache_service.get_stats("video")
 
         mgr = await get_token_manager()
         pools = mgr.pools
@@ -1308,7 +1308,7 @@ async def get_cache_stats_api(request: Request):
 )
 async def load_online_cache_api_async(data: dict):
     """在线资产统计（异步批量 + SSE 进度）"""
-    from app.services.grok.utils.download import DownloadService
+    from app.services.grok.utils.cache import CacheService
     from app.services.token.manager import get_token_manager
 
     mgr = await get_token_manager()
@@ -1361,9 +1361,9 @@ async def load_online_cache_api_async(data: dict):
 
     async def _run():
         try:
-            dl_service = DownloadService()
-            image_stats = dl_service.get_stats("image")
-            video_stats = dl_service.get_stats("video")
+            cache_service = CacheService()
+            image_stats = cache_service.get_stats("image")
+            video_stats = cache_service.get_stats("video")
 
             async def _on_item(item: str, res: dict):
                 ok = bool(res.get("data", {}).get("ok"))
@@ -1430,13 +1430,13 @@ async def load_online_cache_api_async(data: dict):
 @router.post("/api/v1/admin/cache/clear", dependencies=[Depends(verify_api_key)])
 async def clear_local_cache_api(data: dict):
     """清理本地缓存"""
-    from app.services.grok.utils.download import DownloadService
+    from app.services.grok.utils.cache import CacheService
 
     cache_type = data.get("type", "image")
 
     try:
-        dl_service = DownloadService()
-        result = dl_service.clear(cache_type)
+        cache_service = CacheService()
+        result = cache_service.clear(cache_type)
         return {"status": "success", "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1450,13 +1450,13 @@ async def list_local_cache_api(
     page_size: int = 1000,
 ):
     """列出本地缓存文件"""
-    from app.services.grok.utils.download import DownloadService
+    from app.services.grok.utils.cache import CacheService
 
     try:
         if type_:
             cache_type = type_
-        dl_service = DownloadService()
-        result = dl_service.list_files(cache_type, page, page_size)
+        cache_service = CacheService()
+        result = cache_service.list_files(cache_type, page, page_size)
         return {"status": "success", **result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1465,15 +1465,15 @@ async def list_local_cache_api(
 @router.post("/api/v1/admin/cache/item/delete", dependencies=[Depends(verify_api_key)])
 async def delete_local_cache_item_api(data: dict):
     """删除单个本地缓存文件"""
-    from app.services.grok.utils.download import DownloadService
+    from app.services.grok.utils.cache import CacheService
 
     cache_type = data.get("type", "image")
     name = data.get("name")
     if not name:
         raise HTTPException(status_code=400, detail="Missing file name")
     try:
-        dl_service = DownloadService()
-        result = dl_service.delete_file(cache_type, name)
+        cache_service = CacheService()
+        result = cache_service.delete_file(cache_type, name)
         return {"status": "success", "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

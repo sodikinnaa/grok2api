@@ -260,7 +260,7 @@ class VideoService:
 
         # Extract content.
         from app.services.grok.services.chat import MessageExtractor
-        from app.services.grok.services.assets import UploadService
+        from app.services.grok.utils.upload import UploadService
 
         try:
             prompt, attachments = MessageExtractor.extract(messages, is_video=True)
@@ -274,7 +274,7 @@ class VideoService:
             try:
                 for attach_type, attach_data in attachments:
                     if attach_type == "image":
-                        _, file_uri = await upload_service.upload(attach_data, token)
+                        _, file_uri = await upload_service.upload_file(attach_data, token)
                         image_url = f"https://assets.grok.com/{file_uri}"
                         logger.info(f"Image uploaded for video: {image_url}")
                         break
