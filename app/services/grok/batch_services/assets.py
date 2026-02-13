@@ -11,7 +11,7 @@ from app.core.config import get_config
 from app.core.logger import logger
 from app.services.reverse.assets_list import AssetsListReverse
 from app.services.reverse.assets_delete import AssetsDeleteReverse
-from app.services.grok.utils.batch import run_in_batches
+from app.core.batch import run_batch
 
 
 class BaseAssetsService:
@@ -149,7 +149,7 @@ class ListService(BaseAssetsService):
                 return {"detail": detail, "count": 0}
 
         try:
-            return await run_in_batches(
+            return await run_batch(
                 tokens,
                 _fetch_detail,
                 max_concurrent=max_concurrent,
@@ -219,7 +219,7 @@ class DeleteService(BaseAssetsService):
                 return {"status": "error", "error": str(e)}
 
         try:
-            return await run_in_batches(
+            return await run_batch(
                 tokens,
                 _clear_one,
                 max_concurrent=max_concurrent,

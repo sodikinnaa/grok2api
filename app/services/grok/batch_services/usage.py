@@ -10,7 +10,7 @@ from curl_cffi.requests import AsyncSession
 from app.core.logger import logger
 from app.core.config import get_config
 from app.services.reverse.rate_limits import RateLimitsReverse
-from app.services.grok.utils.batch import run_in_batches
+from app.core.batch import run_batch
 
 _USAGE_SEMAPHORE = asyncio.Semaphore(25)
 _USAGE_SEM_VALUE = 25
@@ -71,7 +71,7 @@ class UsageService:
         async def _refresh_one(t: str):
             return await mgr.sync_usage(t, consume_on_fail=False, is_usage=False)
 
-        return await run_in_batches(
+        return await run_batch(
             tokens,
             _refresh_one,
             max_concurrent=max_concurrent,

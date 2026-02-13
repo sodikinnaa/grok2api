@@ -1,13 +1,94 @@
 """
-Batch task manager for admin batch operations (SSE progress).
-"""
+Batch utilities.
 
-from __future__ import annotations
+- run_batch: generic batch concurrency runner
+- BatchTask: SSE task manager for admin batch operations
+"""
 
 import asyncio
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar
+
+from app.core.logger import logger
+
+T = TypeVar("T")
+
+
+async def run_batch(
+    items: List[str],
+    worker: Callable[[str], Awaitable[T]],
+    *,
+    max_concurrent: int = 10,
+    batch_size: int = 50,
+    task: Optional["BatchTask"] = None,
+    on_item: Optional[Callable[[str, Dict[str, Any]], Awaitable[None]]] = None,
+    should_cancel: Optional[Callable[[], bool]] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    分批并发执行，单项失败不影响整体
+
+    Args:
+        items: 待处理项列表
+        worker: 异步处理函数
+        max_concurrent: 最大并发数
+        batch_size: 每批大小
+
+    Returns:
+        {item: {"ok": bool, "data": ..., "error": ...}}
+    """
+    try:
+        max_concurrent = int(max_concurrent)
+    except Exception:
+        max_concurrent = 10
+    try:
+        batch_size = int(batch_size)
+    except Exception:
+        batch_size = 50
+
+    max_concurrent = max(1, max_concurrent)
+    batch_size = max(1, batch_size)
+
+    sem = asyncio.Semaphore(max_concurrent)
+
+    async def _one(item: str) -> tuple[str, dict]:
+        if (should_cancel and should_cancel()) or (task and task.cancelled):
+            return item, {"ok": False, "error": "cancelled", "cancelled": True}
+        async with sem:
+            try:
+                data = await worker(item)
+                result = {"ok": True, "data": data}
+                if task:
+                    task.record(True)
+                if on_item:
+                    try:
+                        await on_item(item, result)
+                    except Exception:
+                        pass
+                return item, result
+            except Exception as e:
+                logger.warning(f"Batch item failed: {item[:16]}... - {e}")
+                result = {"ok": False, "error": str(e)}
+                if task:
+                    task.record(False, error=str(e))
+                if on_item:
+                    try:
+                        await on_item(item, result)
+                    except Exception:
+                        pass
+                return item, result
+
+    results: Dict[str, dict] = {}
+
+    # 分批执行，避免一次性创建所有 task
+    for i in range(0, len(items), batch_size):
+        if (should_cancel and should_cancel()) or (task and task.cancelled):
+            break
+        chunk = items[i : i + batch_size]
+        pairs = await asyncio.gather(*(_one(x) for x in chunk))
+        results.update(dict(pairs))
+
+    return results
 
 
 class BatchTask:
@@ -150,3 +231,13 @@ def delete_task(task_id: str) -> None:
 async def expire_task(task_id: str, delay: int = 300) -> None:
     await asyncio.sleep(delay)
     delete_task(task_id)
+
+
+__all__ = [
+    "run_batch",
+    "BatchTask",
+    "create_task",
+    "get_task",
+    "delete_task",
+    "expire_task",
+]

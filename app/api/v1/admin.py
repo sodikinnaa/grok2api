@@ -12,7 +12,7 @@ from typing import Optional, List, Tuple
 from pydantic import BaseModel
 from app.core.auth import verify_api_key, verify_app_key, get_admin_api_key
 from app.core.config import config, get_config
-from app.core.batch_tasks import create_task, get_task, expire_task
+from app.core.batch import create_task, get_task, expire_task
 from app.core.storage import get_storage, LocalStorage, RedisStorage, SQLStorage
 from app.core.exceptions import AppException
 from app.services.token.manager import get_token_manager

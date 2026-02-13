@@ -12,7 +12,7 @@ from app.core.exceptions import UpstreamException
 from app.services.reverse.accept_tos import AcceptTosReverse
 from app.services.reverse.nsfw_mgmt import NsfwMgmtReverse
 from app.services.reverse.set_birth import SetBirthReverse
-from app.services.grok.utils.batch import run_in_batches
+from app.core.batch import run_batch
 
 
 class NSFWService:
@@ -85,7 +85,7 @@ class NSFWService:
                 logger.error(f"NSFW enable failed: {e}")
                 return {"success": False, "http_status": 0, "error": str(e)[:100]}
 
-        return await run_in_batches(
+        return await run_batch(
             tokens,
             _enable,
             max_concurrent=max_concurrent,
