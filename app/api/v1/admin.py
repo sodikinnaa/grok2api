@@ -816,15 +816,9 @@ async def refresh_tokens_api(data: dict):
         # 去重
         unique_tokens = _dedupe_tokens(tokens)
 
-        # 批量执行配置
-        max_concurrent = get_config("usage.concurrent")
-        batch_size = get_config("usage.batch_size")
-
         raw_results = await UsageService.batch(
             unique_tokens,
             mgr,
-            max_concurrent=max_concurrent,
-            batch_size=batch_size,
         )
 
         results = {}
@@ -854,9 +848,6 @@ async def refresh_tokens_api_async(data: dict):
     # 去重
     unique_tokens = _dedupe_tokens(tokens)
 
-    max_concurrent = get_config("usage.concurrent")
-    batch_size = get_config("usage.batch_size")
-
     task = create_task(len(unique_tokens))
 
     async def _run():
@@ -868,8 +859,6 @@ async def refresh_tokens_api_async(data: dict):
             raw_results = await UsageService.batch(
                 unique_tokens,
                 mgr,
-                max_concurrent=max_concurrent,
-                batch_size=batch_size,
                 on_item=_on_item,
                 should_cancel=lambda: task.cancelled,
             )
@@ -939,15 +928,9 @@ async def enable_nsfw_api(data: dict):
         # 去重
         unique_tokens = _dedupe_tokens(tokens)
 
-        # 批量执行配置
-        max_concurrent = get_config("nsfw.concurrent")
-        batch_size = get_config("nsfw.batch_size")
-
         raw_results = await NSFWService.batch(
             unique_tokens,
             mgr,
-            max_concurrent=max_concurrent,
-            batch_size=batch_size,
         )
 
         # 构造返回结果（mask token）
@@ -1005,9 +988,6 @@ async def enable_nsfw_api_async(data: dict):
     # 去重
     unique_tokens = _dedupe_tokens(tokens)
 
-    max_concurrent = get_config("nsfw.concurrent")
-    batch_size = get_config("nsfw.batch_size")
-
     task = create_task(len(unique_tokens))
 
     async def _run():
@@ -1020,8 +1000,6 @@ async def enable_nsfw_api_async(data: dict):
             raw_results = await NSFWService.batch(
                 unique_tokens,
                 mgr,
-                max_concurrent=max_concurrent,
-                batch_size=batch_size,
                 on_item=_on_item,
                 should_cancel=lambda: task.cancelled,
             )
@@ -1123,15 +1101,11 @@ async def get_cache_stats_api(request: Request):
         }
         online_details = []
         account_map = {a["token"]: a for a in accounts}
-        batch_size = max(1, int(get_config("asset.list_batch_size")))
-        max_concurrent = batch_size
         if selected_tokens:
             total = 0
             raw_results = await ListService.fetch_assets_details(
                 selected_tokens,
                 account_map,
-                max_concurrent=max_concurrent,
-                batch_size=batch_size,
             )
             for token, res in raw_results.items():
                 if res.get("ok"):
@@ -1164,8 +1138,6 @@ async def get_cache_stats_api(request: Request):
             raw_results = await ListService.fetch_assets_details(
                 tokens,
                 account_map,
-                max_concurrent=max_concurrent,
-                batch_size=batch_size,
             )
             for token, res in raw_results.items():
                 if res.get("ok"):
@@ -1197,8 +1169,6 @@ async def get_cache_stats_api(request: Request):
                 raw_results = await ListService.fetch_assets_details(
                     [token],
                     account_map,
-                    max_concurrent=1,
-                    batch_size=1,
                 )
                 res = raw_results.get(token, {})
                 data = res.get("data", {})
@@ -1289,9 +1259,6 @@ async def load_online_cache_api_async(data: dict):
     else:
         raise HTTPException(status_code=400, detail="No tokens provided")
 
-    batch_size = get_config("asset.list_batch_size")
-    max_concurrent = batch_size
-
     task = create_task(len(selected_tokens))
 
     async def _run():
@@ -1307,8 +1274,6 @@ async def load_online_cache_api_async(data: dict):
             raw_results = await ListService.fetch_assets_details(
                 selected_tokens,
                 account_map,
-                max_concurrent=max_concurrent,
-                batch_size=batch_size,
                 include_ok=True,
                 on_item=_on_item,
                 should_cancel=lambda: task.cancelled,
@@ -1426,14 +1391,9 @@ async def clear_online_cache_api(data: dict):
             token_list = list(dict.fromkeys(token_list))
 
             results = {}
-            batch_size = max(1, int(get_config("asset.delete_batch_size")))
-            max_concurrent = batch_size
-
             raw_results = await DeleteService.clear_assets(
                 token_list,
                 mgr,
-                max_concurrent=max_concurrent,
-                batch_size=batch_size,
             )
             for token, res in raw_results.items():
                 if res.get("ok"):
@@ -1452,8 +1412,6 @@ async def clear_online_cache_api(data: dict):
         raw_results = await DeleteService.clear_assets(
             [token],
             mgr,
-            max_concurrent=1,
-            batch_size=1,
         )
         res = raw_results.get(token, {})
         data = res.get("data", {})
@@ -1480,9 +1438,6 @@ async def clear_online_cache_api_async(data: dict):
     if not token_list:
         raise HTTPException(status_code=400, detail="No tokens provided")
 
-    batch_size = get_config("asset.delete_batch_size")
-    max_concurrent = batch_size
-
     task = create_task(len(token_list))
 
     async def _run():
@@ -1494,8 +1449,6 @@ async def clear_online_cache_api_async(data: dict):
             raw_results = await DeleteService.clear_assets(
                 token_list,
                 mgr,
-                max_concurrent=max_concurrent,
-                batch_size=batch_size,
                 include_ok=True,
                 on_item=_on_item,
                 should_cancel=lambda: task.cancelled,

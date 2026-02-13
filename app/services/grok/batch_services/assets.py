@@ -106,8 +106,6 @@ class ListService(BaseAssetsService):
         tokens: List[str],
         account_map: dict,
         *,
-        max_concurrent: int,
-        batch_size: int,
         include_ok: bool = False,
         on_item=None,
         should_cancel=None,
@@ -115,6 +113,7 @@ class ListService(BaseAssetsService):
         """Batch fetch assets details for tokens."""
         account_map = account_map or {}
         shared_service = ListService()
+        batch_size = max(1, int(get_config("asset.list_batch_size")))
 
         async def _fetch_detail(token: str):
             account = account_map.get(token)
@@ -152,7 +151,6 @@ class ListService(BaseAssetsService):
             return await run_batch(
                 tokens,
                 _fetch_detail,
-                max_concurrent=max_concurrent,
                 batch_size=batch_size,
                 on_item=on_item,
                 should_cancel=should_cancel,
@@ -194,8 +192,6 @@ class DeleteService(BaseAssetsService):
         tokens: List[str],
         mgr,
         *,
-        max_concurrent: int,
-        batch_size: int,
         include_ok: bool = False,
         on_item=None,
         should_cancel=None,
@@ -203,6 +199,7 @@ class DeleteService(BaseAssetsService):
         """Batch clear assets for tokens."""
         delete_service = DeleteService()
         list_service = ListService()
+        batch_size = max(1, int(get_config("asset.delete_batch_size")))
 
         async def _clear_one(token: str):
             try:
@@ -222,7 +219,6 @@ class DeleteService(BaseAssetsService):
             return await run_batch(
                 tokens,
                 _clear_one,
-                max_concurrent=max_concurrent,
                 batch_size=batch_size,
                 on_item=on_item,
                 should_cancel=should_cancel,

@@ -12,8 +12,17 @@ from app.core.config import get_config
 from app.services.reverse.rate_limits import RateLimitsReverse
 from app.core.batch import run_batch
 
-_USAGE_SEMAPHORE = asyncio.Semaphore(25)
-_USAGE_SEM_VALUE = 25
+_USAGE_SEMAPHORE = None
+_USAGE_SEM_VALUE = None
+
+
+def _get_usage_semaphore() -> asyncio.Semaphore:
+    value = max(1, int(get_config("usage.concurrent")))
+    global _USAGE_SEMAPHORE, _USAGE_SEM_VALUE
+    if _USAGE_SEMAPHORE is None or value != _USAGE_SEM_VALUE:
+        _USAGE_SEM_VALUE = value
+        _USAGE_SEMAPHORE = asyncio.Semaphore(value)
+    return _USAGE_SEMAPHORE
 
 
 class UsageService:
@@ -32,17 +41,7 @@ class UsageService:
         Raises:
             UpstreamException: 当获取失败且重试耗尽时
         """
-        value = get_config("usage.concurrent")
-        try:
-            value = int(value)
-        except Exception:
-            value = 25
-        value = max(1, value)
-        global _USAGE_SEMAPHORE, _USAGE_SEM_VALUE
-        if value != _USAGE_SEM_VALUE:
-            _USAGE_SEM_VALUE = value
-            _USAGE_SEMAPHORE = asyncio.Semaphore(value)
-        async with _USAGE_SEMAPHORE:
+        async with _get_usage_semaphore():
             try:
                 async with AsyncSession() as session:
                     response = await RateLimitsReverse.request(session, token)
@@ -63,18 +62,16 @@ class UsageService:
         tokens: List[str],
         mgr,
         *,
-        max_concurrent: int,
-        batch_size: int,
         on_item: Optional[Callable[[str, Dict[str, Any]], Awaitable[None]]] = None,
         should_cancel: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, Dict[str, Any]]:
+        batch_size = get_config("usage.batch_size")
         async def _refresh_one(t: str):
             return await mgr.sync_usage(t, consume_on_fail=False, is_usage=False)
 
         return await run_batch(
             tokens,
             _refresh_one,
-            max_concurrent=max_concurrent,
             batch_size=batch_size,
             on_item=on_item,
             should_cancel=should_cancel,

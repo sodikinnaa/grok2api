@@ -19,7 +19,6 @@ async def run_batch(
     items: List[str],
     worker: Callable[[str], Awaitable[T]],
     *,
-    max_concurrent: int = 10,
     batch_size: int = 50,
     task: Optional["BatchTask"] = None,
     on_item: Optional[Callable[[str, Dict[str, Any]], Awaitable[None]]] = None,
@@ -31,52 +30,43 @@ async def run_batch(
     Args:
         items: 待处理项列表
         worker: 异步处理函数
-        max_concurrent: 最大并发数
         batch_size: 每批大小
 
     Returns:
         {item: {"ok": bool, "data": ..., "error": ...}}
     """
     try:
-        max_concurrent = int(max_concurrent)
-    except Exception:
-        max_concurrent = 10
-    try:
         batch_size = int(batch_size)
     except Exception:
         batch_size = 50
 
-    max_concurrent = max(1, max_concurrent)
     batch_size = max(1, batch_size)
-
-    sem = asyncio.Semaphore(max_concurrent)
 
     async def _one(item: str) -> tuple[str, dict]:
         if (should_cancel and should_cancel()) or (task and task.cancelled):
             return item, {"ok": False, "error": "cancelled", "cancelled": True}
-        async with sem:
-            try:
-                data = await worker(item)
-                result = {"ok": True, "data": data}
-                if task:
-                    task.record(True)
-                if on_item:
-                    try:
-                        await on_item(item, result)
-                    except Exception:
-                        pass
-                return item, result
-            except Exception as e:
-                logger.warning(f"Batch item failed: {item[:16]}... - {e}")
-                result = {"ok": False, "error": str(e)}
-                if task:
-                    task.record(False, error=str(e))
-                if on_item:
-                    try:
-                        await on_item(item, result)
-                    except Exception:
-                        pass
-                return item, result
+        try:
+            data = await worker(item)
+            result = {"ok": True, "data": data}
+            if task:
+                task.record(True)
+            if on_item:
+                try:
+                    await on_item(item, result)
+                except Exception:
+                    pass
+            return item, result
+        except Exception as e:
+            logger.warning(f"Batch item failed: {item[:16]}... - {e}")
+            result = {"ok": False, "error": str(e)}
+            if task:
+                task.record(False, error=str(e))
+            if on_item:
+                try:
+                    await on_item(item, result)
+                except Exception:
+                    pass
+            return item, result
 
     results: Dict[str, dict] = {}
 

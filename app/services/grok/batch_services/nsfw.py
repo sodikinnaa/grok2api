@@ -2,6 +2,7 @@
 Batch NSFW service.
 """
 
+import asyncio
 from typing import Callable, Awaitable, Dict, Any, Optional
 
 from curl_cffi.requests import AsyncSession
@@ -15,6 +16,19 @@ from app.services.reverse.set_birth import SetBirthReverse
 from app.core.batch import run_batch
 
 
+_NSFW_SEMAPHORE = None
+_NSFW_SEM_VALUE = None
+
+
+def _get_nsfw_semaphore() -> asyncio.Semaphore:
+    value = max(1, int(get_config("nsfw.concurrent")))
+    global _NSFW_SEMAPHORE, _NSFW_SEM_VALUE
+    if _NSFW_SEMAPHORE is None or value != _NSFW_SEM_VALUE:
+        _NSFW_SEM_VALUE = value
+        _NSFW_SEMAPHORE = asyncio.Semaphore(value)
+    return _NSFW_SEMAPHORE
+
+
 class NSFWService:
     """NSFW 模式服务"""
     @staticmethod
@@ -22,12 +36,11 @@ class NSFWService:
         tokens: list[str],
         mgr,
         *,
-        max_concurrent: int,
-        batch_size: int,
         on_item: Optional[Callable[[str, Dict[str, Any]], Awaitable[None]]] = None,
         should_cancel: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, Dict[str, Any]]:
         """Batch enable NSFW."""
+        batch_size = get_config("nsfw.batch_size")
         async def _enable(token: str):
             try:
                 browser = get_config("security.browser")
@@ -43,7 +56,8 @@ class NSFWService:
                         return status or 0
 
                     try:
-                        await AcceptTosReverse.request(session, token)
+                        async with _get_nsfw_semaphore():
+                            await AcceptTosReverse.request(session, token)
                     except UpstreamException as e:
                         status = await _record_fail(e, "tos_auth_failed")
                         return {
@@ -53,7 +67,8 @@ class NSFWService:
                         }
 
                     try:
-                        await SetBirthReverse.request(session, token)
+                        async with _get_nsfw_semaphore():
+                            await SetBirthReverse.request(session, token)
                     except UpstreamException as e:
                         status = await _record_fail(e, "set_birth_auth_failed")
                         return {
@@ -63,7 +78,8 @@ class NSFWService:
                         }
 
                     try:
-                        grpc_status = await NsfwMgmtReverse.request(session, token)
+                        async with _get_nsfw_semaphore():
+                            grpc_status = await NsfwMgmtReverse.request(session, token)
                         success = grpc_status.code in (-1, 0)
                     except UpstreamException as e:
                         status = await _record_fail(e, "nsfw_mgmt_auth_failed")
@@ -88,7 +104,6 @@ class NSFWService:
         return await run_batch(
             tokens,
             _enable,
-            max_concurrent=max_concurrent,
             batch_size=batch_size,
             on_item=on_item,
             should_cancel=should_cancel,

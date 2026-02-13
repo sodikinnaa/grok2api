@@ -50,8 +50,6 @@ class RateLimitsReverse:
 
             # Curl Config
             timeout = get_config("usage.timeout")
-            if timeout is None:
-                timeout = get_config("network.timeout")
             browser = get_config("security.browser")
 
             async def _do_request():
