@@ -7,9 +7,6 @@
 
 Grok2API rebuilt with **FastAPI**, fully aligned with the latest web call format. Supports streaming/non-streaming chat, image generation/editing, video generation/upscale, deep reasoning, token pool concurrency, and automatic load balancing.
 
-> [!IMPORTANT]
-> The project is no longer accepting PRs or new features; this is the last structure optimization.
-
 <img width="2480" height="1686" alt="image" src="https://github.com/user-attachments/assets/c85546a2-9729-4e8a-9c4d-6dc16c62b6b4" />
 
 <br>
