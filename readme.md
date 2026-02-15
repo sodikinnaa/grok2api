@@ -7,7 +7,7 @@
 
 基于 **FastAPI** 重构的 Grok2API，全面适配最新 Web 调用格式，支持流/非流式对话、图像生成/编辑、视频生成/超分（文生视频 / 图生视频）、深度思考，号池并发与自动负载均衡一体化。
 
-<img width="2480" height="1686" alt="image" src="https://github.com/user-attachments/assets/c85546a2-9729-4e8a-9c4d-6dc16c62b6b4" />
+<img width="2618" height="1658" alt="image" src="https://github.com/user-attachments/assets/a8c406f8-4c28-483a-8099-c23df5df7605" />
 
 <br>
 
@@ -94,15 +94,18 @@ docker compose up -d
 | 模型名 | 计次 | 可用账号 | 对话功能 | 图像功能 | 视频功能 |
 | :-- | :--: | :-- | :--: | :--: | :--: |
 | `grok-3` | 1 | Basic/Super | 支持 | 支持 | - |
-| `grok-3-fast` | 1 | Basic/Super | 支持 | 支持 | - |
+| `grok-3-mini` | 1 | Basic/Super | 支持 | 支持 | - |
+| `grok-3-thinking` | 1 | Basic/Super | 支持 | 支持 | - |
 | `grok-4` | 1 | Basic/Super | 支持 | 支持 | - |
 | `grok-4-mini` | 1 | Basic/Super | 支持 | 支持 | - |
-| `grok-4-fast` | 1 | Basic/Super | 支持 | 支持 | - |
+| `grok-4-thinking` | 1 | Basic/Super | 支持 | 支持 | - |
 | `grok-4-heavy` | 4 | Super | 支持 | 支持 | - |
-| `grok-4.1` | 1 | Basic/Super | 支持 | 支持 | - |
+| `grok-4.1-mini` | 1 | Basic/Super | 支持 | 支持 | - |
+| `grok-4.1-fast` | 1 | Basic/Super | 支持 | 支持 | - |
+| `grok-4.1-expert` | 4 | Basic/Super | 支持 | 支持 | - |
 | `grok-4.1-thinking` | 4 | Basic/Super | 支持 | 支持 | - |
-| `grok-imagine-1.0` | 4 | Basic/Super | - | 支持 | - |
-| `grok-imagine-1.0-edit` | 4 | Basic/Super | - | 支持 | - |
+| `grok-imagine-1.0` | - | Basic/Super | - | 支持 | - |
+| `grok-imagine-1.0-edit` | - | Basic/Super | - | 支持 | - |
 | `grok-imagine-1.0-video` | - | Basic/Super | - | - | 支持 |
 
 <br>

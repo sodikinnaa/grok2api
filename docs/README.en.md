@@ -7,7 +7,7 @@
 
 Grok2API rebuilt with **FastAPI**, fully aligned with the latest web call format. Supports streaming/non-streaming chat, image generation/editing, video generation/upscale (text-to-video and image-to-video), deep reasoning, token pool concurrency, and automatic load balancing.
 
-<img width="2480" height="1686" alt="image" src="https://github.com/user-attachments/assets/c85546a2-9729-4e8a-9c4d-6dc16c62b6b4" />
+<img width="2618" height="1658" alt="image" src="https://github.com/user-attachments/assets/a8c406f8-4c28-483a-8099-c23df5df7605" />
 
 <br>
 
@@ -94,15 +94,18 @@ docker compose up -d
 | Model | Cost | Account | Chat | Image | Video |
 | :-- | :--: | :-- | :--: | :--: | :--: |
 | `grok-3` | 1 | Basic/Super | Yes | Yes | - |
-| `grok-3-fast` | 1 | Basic/Super | Yes | Yes | - |
+| `grok-3-mini` | 1 | Basic/Super | Yes | Yes | - |
+| `grok-3-thinking` | 1 | Basic/Super | Yes | Yes | - |
 | `grok-4` | 1 | Basic/Super | Yes | Yes | - |
 | `grok-4-mini` | 1 | Basic/Super | Yes | Yes | - |
-| `grok-4-fast` | 1 | Basic/Super | Yes | Yes | - |
+| `grok-4-thinking` | 1 | Basic/Super | Yes | Yes | - |
 | `grok-4-heavy` | 4 | Super | Yes | Yes | - |
-| `grok-4.1` | 1 | Basic/Super | Yes | Yes | - |
+| `grok-4.1-mini` | 1 | Basic/Super | Yes | Yes | - |
+| `grok-4.1-fast` | 1 | Basic/Super | Yes | Yes | - |
+| `grok-4.1-expert` | 4 | Basic/Super | Yes | Yes | - |
 | `grok-4.1-thinking` | 4 | Basic/Super | Yes | Yes | - |
-| `grok-imagine-1.0` | 4 | Basic/Super | - | Yes | - |
-| `grok-imagine-1.0-edit` | 4 | Basic/Super | - | Yes | - |
+| `grok-imagine-1.0` | - | Basic/Super | - | Yes | - |
+| `grok-imagine-1.0-edit` | - | Basic/Super | - | Yes | - |
 | `grok-imagine-1.0-video` | - | Basic/Super | - | - | Yes |
 
 <br>
