@@ -48,6 +48,7 @@ class ImageGenerationService:
         size: str,
         aspect_ratio: str,
         stream: bool,
+        enable_nsfw: Optional[bool] = None,
     ) -> ImageGenerationResult:
         max_token_retries = int(get_config("retry.max_retry"))
         tried_tokens: set[str] = set()
@@ -83,6 +84,7 @@ class ImageGenerationService:
                             response_format=response_format,
                             size=size,
                             aspect_ratio=aspect_ratio,
+                            enable_nsfw=enable_nsfw,
                         )
                         async for chunk in result.data:
                             yielded = True
@@ -137,6 +139,7 @@ class ImageGenerationService:
                     n=n,
                     response_format=response_format,
                     aspect_ratio=aspect_ratio,
+                    enable_nsfw=enable_nsfw,
                 )
             except UpstreamException as e:
                 last_error = e
@@ -169,8 +172,10 @@ class ImageGenerationService:
         response_format: str,
         size: str,
         aspect_ratio: str,
+        enable_nsfw: Optional[bool] = None,
     ) -> ImageGenerationResult:
-        enable_nsfw = bool(get_config("image.nsfw"))
+        if enable_nsfw is None:
+            enable_nsfw = bool(get_config("image.nsfw"))
         upstream = image_service.stream(
             token=token,
             prompt=prompt,
@@ -203,8 +208,10 @@ class ImageGenerationService:
         n: int,
         response_format: str,
         aspect_ratio: str,
+        enable_nsfw: Optional[bool] = None,
     ) -> ImageGenerationResult:
-        enable_nsfw = bool(get_config("image.nsfw"))
+        if enable_nsfw is None:
+            enable_nsfw = bool(get_config("image.nsfw"))
         all_images: List[str] = []
         seen = set()
         expected_per_call = 6
@@ -498,6 +505,8 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
                         "size": self.size,
                         "index": index,
                         "partial_image_index": partial_index,
+                        "image_id": image_id,
+                        "stage": stage,
                     },
                 )
 
@@ -550,6 +559,8 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
                     "created_at": int(time.time()),
                     "size": self.size,
                     "index": index,
+                    "image_id": image_id,
+                    "stage": "final",
                     "usage": {
                         "total_tokens": 0,
                         "input_tokens": 0,

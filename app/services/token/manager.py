@@ -299,6 +299,14 @@ class TokenManager:
         )
         return None
 
+    def get_pool_name_for_token(self, token_str: str) -> Optional[str]:
+        """Return pool name for the given token string."""
+        raw_token = token_str.replace("sso=", "")
+        for pool_name, pool in self.pools.items():
+            if pool.get(raw_token):
+                return pool_name
+        return None
+
     async def consume(
         self, token_str: str, effort: EffortType = EffortType.LOW
     ) -> bool:

@@ -341,59 +341,19 @@ class StreamProcessor(proc_base.BaseProcessor):
         self.think_opened: bool = False
         self.role_sent: bool = False
         self.filter_tags = get_config("app.filter_tags")
-        self._tag_buffer: str = ""
-        self._in_filter_tag: bool = False
 
         self.show_think = bool(show_think)
 
     def _filter_token(self, token: str) -> str:
-        """Filter special tags (supports cross-token tag filtering)."""
-        if not self.filter_tags:
+        """Filter special tags in current token only."""
+        if not self.filter_tags or not token:
             return token
 
-        result = []
-        i = 0
-        while i < len(token):
-            char = token[i]
+        for tag in self.filter_tags:
+            if f"<{tag}" in token or f"</{tag}" in token:
+                return ""
 
-            if self._in_filter_tag:
-                self._tag_buffer += char
-                if char == ">":
-                    if "/>" in self._tag_buffer:
-                        self._in_filter_tag = False
-                        self._tag_buffer = ""
-                    else:
-                        for tag in self.filter_tags:
-                            if f"</{tag}>" in self._tag_buffer:
-                                self._in_filter_tag = False
-                                self._tag_buffer = ""
-                                break
-                i += 1
-                continue
-
-            if char == "<":
-                remaining = token[i:]
-                tag_started = False
-                for tag in self.filter_tags:
-                    if remaining.startswith(f"<{tag}"):
-                        tag_started = True
-                        break
-                    if len(remaining) < len(tag) + 1:
-                        for j in range(1, len(remaining) + 1):
-                            if f"<{tag}".startswith(remaining[:j]):
-                                tag_started = True
-                                break
-
-                if tag_started:
-                    self._in_filter_tag = True
-                    self._tag_buffer = char
-                    i += 1
-                    continue
-
-            result.append(char)
-            i += 1
-
-        return "".join(result)
+        return token
 
     def _sse(self, content: str = "", role: str = None, finish: str = None) -> str:
         """Build SSE response."""

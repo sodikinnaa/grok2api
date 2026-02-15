@@ -28,6 +28,7 @@
 
 .config-field {
   padding-top: 2px;
+  position: relative;
 }
 
 .config-field-title {
@@ -44,4 +45,15 @@
 
 .config-field-input {
   margin-top: 6px;
+}
+
+.config-field.has-action {
+  padding-right: 44px;
+}
+
+.config-field-action {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }

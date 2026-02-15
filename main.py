@@ -124,7 +124,7 @@ def create_app() -> FastAPI:
     # 注册管理与公共路由
     from app.api.v1.admin import router as admin_router
     from app.api.v1.public import router as public_router
-    from app.api.v1.pages import router as pages_router
+    from app.api.pages import router as pages_router
 
     app.include_router(admin_router, prefix="/v1/admin")
     app.include_router(public_router, prefix="/v1/public")

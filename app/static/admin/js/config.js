@@ -37,17 +37,17 @@ const LOCALE_MAP = {
     "label": "应用设置",
     "api_key": { title: "API 密钥", desc: "调用 Grok2API 服务的 Token（可选）。" },
     "app_key": { title: "后台密码", desc: "登录 Grok2API 管理后台的密码（必填）。" },
-    "public_key": { title: "Public Key", desc: "Public 接口访问密钥（可选）。" },
-    "public_enabled": { title: "公开功能玩法", desc: "开启后 public 入口可访问（public_key 为空时默认放开）。" },
+    "public_enabled": { title: "启用功能玩法", desc: "是否启用功能玩法入口（关闭则功能玩法页面不可访问）。" },
+    "public_key": { title: "Public 密码", desc: "功能玩法页面的访问密码（可选）。" },
     "app_url": { title: "应用地址", desc: "当前 Grok2API 服务的外部访问 URL，用于文件链接访问。" },
-    "image_format": { title: "图片格式", desc: "生成的图片格式（url 或 base64）。" },
-    "video_format": { title: "视频格式", desc: "生成的视频格式（html 或 url，url 为处理后的链接）。" },
-    "temporary": { title: "临时对话", desc: "是否启用临时对话模式。" },
-    "disable_memory": { title: "禁用记忆", desc: "禁用 Grok 记忆功能，以防止响应中出现不相关上下文。" },
+    "image_format": { title: "图片格式", desc: "默认生成的图片格式（url 或 base64）。" },
+    "video_format": { title: "视频格式", desc: "默认生成的视频格式（html 或 url，url 为处理后的链接）。" },
+    "temporary": { title: "临时对话", desc: "是否默认启用临时对话模式。" },
+    "disable_memory": { title: "禁用记忆", desc: "是否默认禁用 Grok 记忆功能。" },
     "stream": { title: "流式响应", desc: "是否默认启用流式输出。" },
-    "thinking": { title: "思维链", desc: "是否启用模型思维链输出。" },
-    "dynamic_statsig": { title: "动态指纹", desc: "是否启用动态生成 Statsig 值。" },
-    "filter_tags": { title: "过滤标签", desc: "自动过滤 Grok 响应中的特殊标签。" }
+    "thinking": { title: "思维链", desc: "是否默认启用思维链输出。" },
+    "dynamic_statsig": { title: "动态指纹", desc: "是否默认启用动态生成 Statsig 指纹。" },
+    "filter_tags": { title: "过滤标签", desc: "设置自动过滤 Grok 响应中的特殊标签。" }
   },
 
 
@@ -258,6 +258,15 @@ function buildSecretInput(section, key, val) {
   const wrapper = document.createElement('div');
   wrapper.className = 'flex items-center gap-2';
 
+  const genBtn = document.createElement('button');
+  genBtn.className = 'flex-none w-[32px] h-[32px] flex items-center justify-center bg-black text-white rounded-md hover:opacity-80 transition-opacity';
+  genBtn.type = 'button';
+  genBtn.title = '生成';
+  genBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg>`;
+  genBtn.onclick = () => {
+    input.value = randomKey(16);
+  };
+
   const copyBtn = document.createElement('button');
   copyBtn.className = 'flex-none w-[32px] h-[32px] flex items-center justify-center bg-black text-white rounded-md hover:opacity-80 transition-opacity';
   copyBtn.type = 'button';
@@ -265,9 +274,27 @@ function buildSecretInput(section, key, val) {
   copyBtn.onclick = () => copyToClipboard(input.value, copyBtn);
 
   wrapper.appendChild(input);
+  wrapper.appendChild(genBtn);
   wrapper.appendChild(copyBtn);
 
   return { input, node: wrapper };
+}
+
+function randomKey(len) {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const out = [];
+  if (window.crypto && window.crypto.getRandomValues) {
+    const buf = new Uint8Array(len);
+    window.crypto.getRandomValues(buf);
+    for (let i = 0; i < len; i++) {
+      out.push(chars[buf[i] % chars.length]);
+    }
+    return out.join('');
+  }
+  for (let i = 0; i < len; i++) {
+    out.push(chars[Math.floor(Math.random() * chars.length)]);
+  }
+  return out.join('');
 }
 
 async function init() {
@@ -398,6 +425,23 @@ function buildFieldCard(section, key, val) {
     inputWrapper.appendChild(built.node);
   }
   fieldCard.appendChild(inputWrapper);
+
+  if (section === 'app' && key === 'public_enabled') {
+    fieldCard.classList.add('has-action');
+    const link = document.createElement('a');
+    link.href = '/login';
+    link.className = 'config-field-action flex-none w-[32px] h-[32px] flex items-center justify-center bg-black text-white rounded-md hover:opacity-80 transition-opacity';
+    link.title = '功能玩法';
+    link.setAttribute('aria-label', '功能玩法');
+    link.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+    link.style.display = val ? 'inline-flex' : 'none';
+    fieldCard.appendChild(link);
+    if (built && built.input) {
+      built.input.addEventListener('change', () => {
+        link.style.display = built.input.checked ? 'inline-flex' : 'none';
+      });
+    }
+  }
 
   return fieldCard;
 }

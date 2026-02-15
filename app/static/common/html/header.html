@@ -14,13 +14,15 @@
           class="text-xs text-[var(--accents-4)] hover:text-black">@chenyme</a>
       </div>
       <div class="h-4 w-px bg-[var(--border)]"></div>
-      <a href="/imagine" class="nav-link text-sm" data-nav="/imagine">Imagine</a>
-      <a href="/voice" class="nav-link text-sm" data-nav="/voice">Voice Live</a>
-      <a href="/login" class="nav-link text-sm" data-nav="/login">Public Key</a>
+      <a href="/admin/token" class="nav-link text-sm" data-nav="/admin/token">Token管理</a>
+      <a href="/admin/config" class="nav-link text-sm" data-nav="/admin/config">配置管理</a>
+      <a href="/admin/cache" class="nav-link text-sm" data-nav="/admin/cache">缓存管理</a>
     </div>
     <div class="nav-actions">
-      <a href="/admin/login" class="nav-action-btn">管理后台</a>
-      <button onclick="publicLogout()" type="button" class="nav-action-btn">退出</button>
+      <button id="storage-mode-btn" type="button" class="nav-action-btn" title="存储模式">-</button>
+      <a href="https://github.com/chenyme/grok2api/issues" target="_blank" rel="noopener"
+        class="nav-action-btn">反馈</a>
+      <button onclick="logout()" type="button" class="nav-action-btn">退出</button>
     </div>
   </div>
 </nav>

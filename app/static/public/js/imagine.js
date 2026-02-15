@@ -7,6 +7,9 @@
   const concurrentSelect = document.getElementById('concurrentSelect');
   const autoScrollToggle = document.getElementById('autoScrollToggle');
   const autoDownloadToggle = document.getElementById('autoDownloadToggle');
+  const reverseInsertToggle = document.getElementById('reverseInsertToggle');
+  const autoFilterToggle = document.getElementById('autoFilterToggle');
+  const nsfwSelect = document.getElementById('nsfwSelect');
   const selectFolderBtn = document.getElementById('selectFolderBtn');
   const folderPath = document.getElementById('folderPath');
   const statusText = document.getElementById('statusText');
@@ -36,6 +39,9 @@
   let useFileSystemAPI = false;
   let isSelectionMode = false;
   let selectedImages = new Set();
+  let streamSequence = 0;
+  const streamImageMap = new Map();
+  let finalMinBytesDefault = 100000;
 
   function toast(message, type) {
     if (typeof showToast === 'function') {
@@ -103,6 +109,23 @@
 
   function updateModeValue() {}
 
+  async function loadFilterDefaults() {
+    try {
+      const res = await fetch('/v1/public/imagine/config', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      const value = parseInt(data && data.final_min_bytes, 10);
+      if (Number.isFinite(value) && value >= 0) {
+        finalMinBytesDefault = value;
+      }
+      if (nsfwSelect && typeof data.nsfw === 'boolean') {
+        nsfwSelect.value = data.nsfw ? 'true' : 'false';
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
 
   function updateLatency(value) {
     if (value) {
@@ -121,12 +144,46 @@
 
   function updateError(value) {}
 
+  function isLikelyBase64(raw) {
+    if (!raw) return false;
+    if (raw.startsWith('data:')) return true;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return false;
+    const head = raw.slice(0, 16);
+    if (head.startsWith('/9j/') || head.startsWith('iVBOR') || head.startsWith('R0lGOD')) return true;
+    return /^[A-Za-z0-9+/=\s]+$/.test(raw);
+  }
+
   function inferMime(base64) {
     if (!base64) return 'image/jpeg';
     if (base64.startsWith('iVBOR')) return 'image/png';
     if (base64.startsWith('/9j/')) return 'image/jpeg';
     if (base64.startsWith('R0lGOD')) return 'image/gif';
     return 'image/jpeg';
+  }
+
+  function estimateBase64Bytes(raw) {
+    if (!raw) return null;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return null;
+    }
+    if (raw.startsWith('/') && !isLikelyBase64(raw)) {
+      return null;
+    }
+    let base64 = raw;
+    if (raw.startsWith('data:')) {
+      const comma = raw.indexOf(',');
+      base64 = comma >= 0 ? raw.slice(comma + 1) : '';
+    }
+    base64 = base64.replace(/\s/g, '');
+    if (!base64) return 0;
+    let padding = 0;
+    if (base64.endsWith('==')) padding = 2;
+    else if (base64.endsWith('=')) padding = 1;
+    return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+  }
+
+  function getFinalMinBytes() {
+    return Number.isFinite(finalMinBytesDefault) && finalMinBytesDefault >= 0 ? finalMinBytesDefault : 100000;
   }
 
   function dataUrlToBlob(dataUrl) {
@@ -149,14 +206,14 @@
     }
   }
 
-  async function createImagineTask(prompt, ratio, authHeader) {
+  async function createImagineTask(prompt, ratio, authHeader, nsfwEnabled) {
     const res = await fetch('/v1/public/imagine/start', {
       method: 'POST',
       headers: {
         ...buildAuthHeaders(authHeader),
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ prompt, aspect_ratio: ratio })
+      body: JSON.stringify({ prompt, aspect_ratio: ratio, nsfw: nsfwEnabled })
     });
     if (!res.ok) {
       const text = await res.text();
@@ -166,10 +223,10 @@
     return data && data.task_id ? String(data.task_id) : '';
   }
 
-  async function createImagineTasks(prompt, ratio, concurrent, authHeader) {
+  async function createImagineTasks(prompt, ratio, concurrent, authHeader, nsfwEnabled) {
     const tasks = [];
     for (let i = 0; i < concurrent; i++) {
-      const taskId = await createImagineTask(prompt, ratio, authHeader);
+      const taskId = await createImagineTask(prompt, ratio, authHeader, nsfwEnabled);
       if (!taskId) {
         throw new Error('Missing task id');
       }
@@ -239,6 +296,13 @@
 
   function appendImage(base64, meta) {
     if (!waterfall) return;
+    if (autoFilterToggle && autoFilterToggle.checked) {
+      const bytes = estimateBase64Bytes(base64 || '');
+      const minBytes = getFinalMinBytes();
+      if (bytes !== null && bytes < minBytes) {
+        return;
+      }
+    }
     if (emptyState) {
       emptyState.style.display = 'none';
     }
@@ -282,10 +346,18 @@
       item.classList.add('selection-mode');
     }
     
-    waterfall.appendChild(item);
+    if (reverseInsertToggle && reverseInsertToggle.checked) {
+      waterfall.prepend(item);
+    } else {
+      waterfall.appendChild(item);
+    }
 
     if (autoScrollToggle && autoScrollToggle.checked) {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      if (reverseInsertToggle && reverseInsertToggle.checked) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }
     }
 
     if (autoDownloadToggle && autoDownloadToggle.checked) {
@@ -304,6 +376,132 @@
     }
   }
 
+  function upsertStreamImage(raw, meta, imageId, isFinal) {
+    if (!waterfall || !raw) return;
+    if (emptyState) {
+      emptyState.style.display = 'none';
+    }
+
+    if (isFinal && autoFilterToggle && autoFilterToggle.checked) {
+      const bytes = estimateBase64Bytes(raw);
+      const minBytes = getFinalMinBytes();
+      if (bytes !== null && bytes < minBytes) {
+        const existing = imageId ? streamImageMap.get(imageId) : null;
+        if (existing) {
+          if (selectedImages.has(existing)) {
+            selectedImages.delete(existing);
+            updateSelectedCount();
+          }
+          existing.remove();
+          streamImageMap.delete(imageId);
+          if (imageCount > 0) {
+            imageCount -= 1;
+            updateCount(imageCount);
+          }
+        }
+        return;
+      }
+    }
+
+    const isDataUrl = typeof raw === 'string' && raw.startsWith('data:');
+    const looksLikeBase64 = typeof raw === 'string' && isLikelyBase64(raw);
+    const isHttpUrl = typeof raw === 'string' && (raw.startsWith('http://') || raw.startsWith('https://') || (raw.startsWith('/') && !looksLikeBase64));
+    const mime = isDataUrl || isHttpUrl ? '' : inferMime(raw);
+    const dataUrl = isDataUrl || isHttpUrl ? raw : `data:${mime};base64,${raw}`;
+
+    let item = imageId ? streamImageMap.get(imageId) : null;
+    let isNew = false;
+    if (!item) {
+      isNew = true;
+      streamSequence += 1;
+      const sequence = streamSequence;
+
+      item = document.createElement('div');
+      item.className = 'waterfall-item';
+
+      const checkbox = document.createElement('div');
+      checkbox.className = 'image-checkbox';
+
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.alt = imageId ? `image-${imageId}` : 'image';
+      img.src = dataUrl;
+
+      const metaBar = document.createElement('div');
+      metaBar.className = 'waterfall-meta';
+      const left = document.createElement('div');
+      left.textContent = `#${sequence}`;
+      const right = document.createElement('span');
+      right.textContent = '';
+      if (meta && meta.elapsed_ms) {
+        right.textContent = `${meta.elapsed_ms}ms`;
+      }
+
+      metaBar.appendChild(left);
+      metaBar.appendChild(right);
+
+      item.appendChild(checkbox);
+      item.appendChild(img);
+      item.appendChild(metaBar);
+
+      const prompt = (meta && meta.prompt) ? String(meta.prompt) : (promptInput ? promptInput.value.trim() : '');
+      item.dataset.imageUrl = dataUrl;
+      item.dataset.prompt = prompt || 'image';
+
+      if (isSelectionMode) {
+        item.classList.add('selection-mode');
+      }
+
+      if (reverseInsertToggle && reverseInsertToggle.checked) {
+        waterfall.prepend(item);
+      } else {
+        waterfall.appendChild(item);
+      }
+
+      if (imageId) {
+        streamImageMap.set(imageId, item);
+      }
+
+      imageCount += 1;
+      updateCount(imageCount);
+    } else {
+      const img = item.querySelector('img');
+      if (img) {
+        img.src = dataUrl;
+      }
+      item.dataset.imageUrl = dataUrl;
+      const right = item.querySelector('.waterfall-meta span');
+      if (right && meta && meta.elapsed_ms) {
+        right.textContent = `${meta.elapsed_ms}ms`;
+      }
+    }
+
+    updateError('');
+
+    if (isNew && autoScrollToggle && autoScrollToggle.checked) {
+      if (reverseInsertToggle && reverseInsertToggle.checked) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }
+    }
+
+    if (isFinal && autoDownloadToggle && autoDownloadToggle.checked) {
+      const timestamp = Date.now();
+      const ext = mime === 'image/png' ? 'png' : 'jpg';
+      const filename = `imagine_${timestamp}_${imageId || streamSequence}.${ext}`;
+
+      if (useFileSystemAPI && directoryHandle) {
+        saveToFileSystem(raw, filename).catch(() => {
+          downloadImage(raw, filename);
+        });
+      } else {
+        downloadImage(raw, filename);
+      }
+    }
+  }
+
   function handleMessage(raw) {
     let data = null;
     try {
@@ -313,7 +511,15 @@
     }
     if (!data || typeof data !== 'object') return;
 
-    if (data.type === 'image') {
+    if (data.type === 'image_generation.partial_image' || data.type === 'image_generation.completed') {
+      const imageId = data.image_id || data.imageId;
+      const payload = data.b64_json || data.url || data.image;
+      if (!payload || !imageId) {
+        return;
+      }
+      const isFinal = data.type === 'image_generation.completed' || data.stage === 'final';
+      upsertStreamImage(payload, data, imageId, isFinal);
+    } else if (data.type === 'image') {
       imageCount += 1;
       updateCount(imageCount);
       updateLatency(data.elapsed_ms);
@@ -329,8 +535,8 @@
         }
         setStatus('', '已停止');
       }
-    } else if (data.type === 'error') {
-      const message = data.message || '生成失败';
+    } else if (data.type === 'error' || data.error) {
+      const message = data.message || (data.error && data.error.message) || '生成失败';
       updateError(message);
       toast(message, 'error');
     }
@@ -442,6 +648,7 @@
 
     const concurrent = concurrentSelect ? parseInt(concurrentSelect.value, 10) : 1;
     const ratio = ratioSelect ? ratioSelect.value : '2:3';
+    const nsfwEnabled = nsfwSelect ? nsfwSelect.value === 'true' : true;
     
     if (isRunning) {
       toast('已在运行中', 'warning');
@@ -459,7 +666,7 @@
 
     let taskIds = [];
     try {
-      taskIds = await createImagineTasks(prompt, ratio, concurrent, authHeader);
+      taskIds = await createImagineTasks(prompt, ratio, concurrent, authHeader, nsfwEnabled);
     } catch (e) {
       setStatus('error', '创建任务失败');
       startBtn.disabled = false;
@@ -557,10 +764,12 @@
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     const prompt = promptOverride || (promptInput ? promptInput.value.trim() : '');
     const ratio = ratioSelect ? ratioSelect.value : '2:3';
+    const nsfwEnabled = nsfwSelect ? nsfwSelect.value === 'true' : true;
     const payload = {
       type: 'start',
       prompt,
-      aspect_ratio: ratio
+      aspect_ratio: ratio,
+      nsfw: nsfwEnabled
     };
     ws.send(JSON.stringify(payload));
     updateError('');
@@ -590,6 +799,8 @@
     if (waterfall) {
       waterfall.innerHTML = '';
     }
+    streamImageMap.clear();
+    streamSequence = 0;
     imageCount = 0;
     totalLatency = 0;
     latencyCount = 0;
@@ -623,6 +834,8 @@
       }
     });
   }
+
+  loadFilterDefaults();
 
   if (ratioSelect) {
     ratioSelect.addEventListener('change', () => {

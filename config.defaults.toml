@@ -6,10 +6,10 @@ app_url = "http://127.0.0.1:8000"
 app_key = "grok2api"
 # API 调用密钥（可选）
 api_key = ""
+# 是否启用 public 功能玩法
+public_enabled = false
 # Public 调用密钥（可选）
 public_key = ""
-# 是否公开功能玩法（public 入口）
-public_enabled = false
 # 生成图片的格式（url 或 base64）
 image_format = "url"
 # 生成视频的格式（html 或 url）
@@ -53,9 +53,9 @@ retry_backoff_base = 0.5
 # 退避倍率
 retry_backoff_factor = 2.0
 # 单次重试最大延迟（秒）
-retry_backoff_max = 30.0
+retry_backoff_max = 20.0
 # 总重试预算时间（秒）
-retry_budget = 90.0
+retry_budget = 60.0
 
 
 # ==================== Token 池管理 ====================
@@ -78,12 +78,12 @@ reload_interval_sec = 30
 # 是否启用自动清理
 enable_auto_clean = true
 # 缓存大小上限（MB）
-limit_mb = 1024
+limit_mb = 512
 
 # ==================== 对话配置 ====================
 [chat]
 # Reverse 接口并发上限
-concurrent = 10
+concurrent = 50
 # Reverse 接口超时时间（秒）
 timeout = 60
 # 流式空闲超时时间（秒）
@@ -92,9 +92,9 @@ stream_timeout = 60
 # ==================== 图像配置 ====================
 [image]
 # WebSocket 请求超时时间（秒）
-timeout = 120
+timeout = 60
 # WebSocket 流式空闲超时时间（秒）
-stream_timeout = 120
+stream_timeout = 60
 # 中等图后等待最终图的超时秒数
 final_timeout = 15
 # 是否启用 NSFW
@@ -107,7 +107,7 @@ final_min_bytes = 100000
 # ==================== 视频配置 ====================
 [video]
 # Reverse 接口并发上限
-concurrent = 10
+concurrent = 100
 # Reverse 接口超时时间（秒）
 timeout = 60
 # 流式空闲超时时间（秒）
@@ -116,44 +116,44 @@ stream_timeout = 60
 # ==================== 语音配置 ====================
 [voice]
 # Voice 请求超时时间（秒）
-timeout = 120
+timeout = 60
 
 # ==================== 资产配置 ====================
 [asset]
 # 上传并发数
-upload_concurrent = 30
+upload_concurrent = 100
 # 上传超时时间（秒）
 upload_timeout = 60
 # 下载并发数
-download_concurrent = 30
+download_concurrent = 100
 # 下载超时时间（秒）
 download_timeout = 60
 # 资产查询并发数
-list_concurrent = 10
+list_concurrent = 100
 # 资产查询超时时间（秒）
 list_timeout = 60
 # 资产查询批次大小（Token 维度）
-list_batch_size = 10
+list_batch_size = 50
 # 资产删除并发数
-delete_concurrent = 10
+delete_concurrent = 100
 # 资产删除超时时间（秒）
 delete_timeout = 60
 # 资产删除批次大小（Token 维度）
-delete_batch_size = 10
+delete_batch_size = 50
 
 # ==================== NSFW ====================
 [nsfw]
 # NSFW 批量开启并发上限
-concurrent = 10
+concurrent = 60
 # NSFW 批量开启批次大小
-batch_size = 50
+batch_size = 30
 # NSFW 请求超时时间（秒）
 timeout = 60
 
 # ==================== 用量配置 ====================
 [usage]
 # Usage 批量开启并发上限
-concurrent = 10
+concurrent = 100
 # Usage 批量开启批次大小
 batch_size = 50
 # Usage 请求超时时间（秒）

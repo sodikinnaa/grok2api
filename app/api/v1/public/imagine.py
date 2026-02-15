@@ -1,7 +1,7 @@
 import asyncio
 import time
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 import orjson
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.core.auth import verify_public_key, get_public_api_key, is_public_enabled
+from app.core.config import get_config
 from app.core.logger import logger
 from app.api.v1.image import resolve_aspect_ratio
 from app.services.grok.services.image import ImageGenerationService
@@ -32,7 +33,35 @@ async def _clean_sessions(now: float) -> None:
         _IMAGINE_SESSIONS.pop(key, None)
 
 
-async def _new_session(prompt: str, aspect_ratio: str) -> str:
+def _parse_sse_chunk(chunk: str) -> Optional[Dict[str, Any]]:
+    if not chunk:
+        return None
+    event = None
+    data_lines: List[str] = []
+    for raw in str(chunk).splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("event:"):
+            event = line[6:].strip()
+            continue
+        if line.startswith("data:"):
+            data_lines.append(line[5:].strip())
+    if not data_lines:
+        return None
+    data_str = "\n".join(data_lines)
+    if data_str == "[DONE]":
+        return None
+    try:
+        payload = orjson.loads(data_str)
+    except orjson.JSONDecodeError:
+        return None
+    if event and isinstance(payload, dict) and "type" not in payload:
+        payload["type"] = event
+    return payload
+
+
+async def _new_session(prompt: str, aspect_ratio: str, nsfw: Optional[bool]) -> str:
     task_id = uuid.uuid4().hex
     now = time.time()
     async with _IMAGINE_SESSIONS_LOCK:
@@ -40,6 +69,7 @@ async def _new_session(prompt: str, aspect_ratio: str) -> str:
         _IMAGINE_SESSIONS[task_id] = {
             "prompt": prompt,
             "aspect_ratio": aspect_ratio,
+            "nsfw": nsfw,
             "created_at": now,
         }
     return task_id
@@ -126,7 +156,7 @@ async def public_imagine_ws(websocket: WebSocket):
         run_task = None
         stop_event.clear()
 
-    async def _run(prompt: str, aspect_ratio: str):
+    async def _run(prompt: str, aspect_ratio: str, nsfw: Optional[bool]):
         model_id = "grok-imagine-1.0"
         model_info = ModelService.get(model_id)
         if not model_info or not model_info.is_image:
@@ -140,7 +170,6 @@ async def public_imagine_ws(websocket: WebSocket):
             return
 
         token_mgr = await get_token_manager()
-        sequence = 0
         run_id = uuid.uuid4().hex
 
         await _send(
@@ -175,7 +204,6 @@ async def public_imagine_ws(websocket: WebSocket):
                     await asyncio.sleep(2)
                     continue
 
-                start_at = time.time()
                 result = await ImageGenerationService().generate(
                     token_mgr=token_mgr,
                     token=token,
@@ -185,33 +213,38 @@ async def public_imagine_ws(websocket: WebSocket):
                     response_format="b64_json",
                     size="1024x1024",
                     aspect_ratio=aspect_ratio,
-                    stream=False,
+                    stream=True,
+                    enable_nsfw=nsfw,
                 )
-                elapsed_ms = int((time.time() - start_at) * 1000)
-
-                images = [img for img in result.data if img and img != "error"]
-                if images:
-                    for img_b64 in images:
-                        sequence += 1
+                if result.stream:
+                    async for chunk in result.data:
+                        payload = _parse_sse_chunk(chunk)
+                        if not payload:
+                            continue
+                        if isinstance(payload, dict):
+                            payload.setdefault("run_id", run_id)
+                        await _send(payload)
+                else:
+                    images = [img for img in result.data if img and img != "error"]
+                    if images:
+                        for img_b64 in images:
+                            await _send(
+                                {
+                                    "type": "image",
+                                    "b64_json": img_b64,
+                                    "created_at": int(time.time() * 1000),
+                                    "aspect_ratio": aspect_ratio,
+                                    "run_id": run_id,
+                                }
+                            )
+                    else:
                         await _send(
                             {
-                                "type": "image",
-                                "b64_json": img_b64,
-                                "sequence": sequence,
-                                "created_at": int(time.time() * 1000),
-                                "elapsed_ms": elapsed_ms,
-                                "aspect_ratio": aspect_ratio,
-                                "run_id": run_id,
+                                "type": "error",
+                                "message": "Image generation returned empty data.",
+                                "code": "empty_image",
                             }
                         )
-                else:
-                    await _send(
-                        {
-                            "type": "error",
-                            "message": "Image generation returned empty data.",
-                            "code": "empty_image",
-                        }
-                    )
 
             except asyncio.CancelledError:
                 break
@@ -262,8 +295,11 @@ async def public_imagine_ws(websocket: WebSocket):
                 aspect_ratio = resolve_aspect_ratio(
                     str(payload.get("aspect_ratio") or "2:3").strip() or "2:3"
                 )
+                nsfw = payload.get("nsfw")
+                if nsfw is not None:
+                    nsfw = bool(nsfw)
                 await _stop_run()
-                run_task = asyncio.create_task(_run(prompt, aspect_ratio))
+                run_task = asyncio.create_task(_run(prompt, aspect_ratio, nsfw))
             elif action == "stop":
                 await _stop_run()
             else:
@@ -319,12 +355,16 @@ async def public_imagine_sse(
     if session:
         prompt = str(session.get("prompt") or "").strip()
         ratio = str(session.get("aspect_ratio") or "2:3").strip() or "2:3"
+        nsfw = session.get("nsfw")
     else:
         prompt = (prompt or "").strip()
         if not prompt:
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
         ratio = str(aspect_ratio or "2:3").strip() or "2:3"
         ratio = resolve_aspect_ratio(ratio)
+        nsfw = request.query_params.get("nsfw")
+        if nsfw is not None:
+            nsfw = str(nsfw).lower() in ("1", "true", "yes", "on")
 
     async def event_stream():
         try:
@@ -369,7 +409,6 @@ async def public_imagine_sse(
                         await asyncio.sleep(2)
                         continue
 
-                    start_at = time.time()
                     result = await ImageGenerationService().generate(
                         token_mgr=token_mgr,
                         token=token,
@@ -379,28 +418,35 @@ async def public_imagine_sse(
                         response_format="b64_json",
                         size="1024x1024",
                         aspect_ratio=ratio,
-                        stream=False,
+                        stream=True,
+                        enable_nsfw=nsfw,
                     )
-                    elapsed_ms = int((time.time() - start_at) * 1000)
-
-                    images = [img for img in result.data if img and img != "error"]
-                    if images:
-                        for img_b64 in images:
-                            sequence += 1
-                            payload = {
-                                "type": "image",
-                                "b64_json": img_b64,
-                                "sequence": sequence,
-                                "created_at": int(time.time() * 1000),
-                                "elapsed_ms": elapsed_ms,
-                                "aspect_ratio": ratio,
-                                "run_id": run_id,
-                            }
+                    if result.stream:
+                        async for chunk in result.data:
+                            payload = _parse_sse_chunk(chunk)
+                            if not payload:
+                                continue
+                            if isinstance(payload, dict):
+                                payload.setdefault("run_id", run_id)
                             yield f"data: {orjson.dumps(payload).decode()}\n\n"
                     else:
-                        yield (
-                            f"data: {orjson.dumps({'type': 'error', 'message': 'Image generation returned empty data.', 'code': 'empty_image'}).decode()}\n\n"
-                        )
+                        images = [img for img in result.data if img and img != "error"]
+                        if images:
+                            for img_b64 in images:
+                                sequence += 1
+                                payload = {
+                                    "type": "image",
+                                    "b64_json": img_b64,
+                                    "sequence": sequence,
+                                    "created_at": int(time.time() * 1000),
+                                    "aspect_ratio": ratio,
+                                    "run_id": run_id,
+                                }
+                                yield f"data: {orjson.dumps(payload).decode()}\n\n"
+                        else:
+                            yield (
+                                f"data: {orjson.dumps({'type': 'error', 'message': 'Image generation returned empty data.', 'code': 'empty_image'}).decode()}\n\n"
+                            )
                 except asyncio.CancelledError:
                     break
                 except Exception as e:
@@ -424,9 +470,19 @@ async def public_imagine_sse(
     )
 
 
+@router.get("/imagine/config")
+async def public_imagine_config():
+    return {
+        "final_min_bytes": int(get_config("image.final_min_bytes") or 0),
+        "medium_min_bytes": int(get_config("image.medium_min_bytes") or 0),
+        "nsfw": bool(get_config("image.nsfw")),
+    }
+
+
 class ImagineStartRequest(BaseModel):
     prompt: str
     aspect_ratio: Optional[str] = "2:3"
+    nsfw: Optional[bool] = None
 
 
 @router.post("/imagine/start", dependencies=[Depends(verify_public_key)])
@@ -435,7 +491,7 @@ async def public_imagine_start(data: ImagineStartRequest):
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
     ratio = resolve_aspect_ratio(str(data.aspect_ratio or "2:3").strip() or "2:3")
-    task_id = await _new_session(prompt, ratio)
+    task_id = await _new_session(prompt, ratio, data.nsfw)
     return {"task_id": task_id, "aspect_ratio": ratio}
 
 

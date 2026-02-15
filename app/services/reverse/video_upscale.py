@@ -1,5 +1,5 @@
 """
-Reverse interface: media post create.
+Reverse interface: video upscale.
 """
 
 import orjson
@@ -13,27 +13,20 @@ from app.services.token.service import TokenService
 from app.services.reverse.utils.headers import build_headers
 from app.services.reverse.utils.retry import retry_on_status
 
-MEDIA_POST_API = "https://grok.com/rest/media/post/create"
+VIDEO_UPSCALE_API = "https://grok.com/rest/media/video/upscale"
 
 
-class MediaPostReverse:
-    """/rest/media/post/create reverse interface."""
+class VideoUpscaleReverse:
+    """/rest/media/video/upscale reverse interface."""
 
     @staticmethod
-    async def request(
-        session: AsyncSession,
-        token: str,
-        mediaType: str,
-        mediaUrl: str,
-        prompt: str = "",
-    ) -> Any:
-        """Create media post in Grok.
+    async def request(session: AsyncSession, token: str, video_id: str) -> Any:
+        """Upscale video (image upscaling endpoint) in Grok.
 
         Args:
             session: AsyncSession, the session to use for the request.
             token: str, the SSO token.
-            mediaType: str, the media type.
-            mediaUrl: str, the media URL.
+            video_id: str, the video id.
 
         Returns:
             Any: The response from the request.
@@ -52,11 +45,7 @@ class MediaPostReverse:
             )
 
             # Build payload
-            payload = {"mediaType": mediaType}
-            if mediaUrl:
-                payload["mediaUrl"] = mediaUrl
-            if prompt:
-                payload["prompt"] = prompt
+            payload = {"videoId": video_id}
 
             # Curl Config
             timeout = get_config("video.timeout")
@@ -64,7 +53,7 @@ class MediaPostReverse:
 
             async def _do_request():
                 response = await session.post(
-                    MEDIA_POST_API,
+                    VIDEO_UPSCALE_API,
                     headers=headers,
                     data=orjson.dumps(payload),
                     timeout=timeout,
@@ -79,11 +68,11 @@ class MediaPostReverse:
                     except Exception:
                         pass
                     logger.error(
-                        f"MediaPostReverse: Media post create failed, {response.status_code}",
+                        f"VideoUpscaleReverse: Upscale failed, {response.status_code}",
                         extra={"error_type": "UpstreamException"},
                     )
                     raise UpstreamException(
-                        message=f"MediaPostReverse: Media post create failed, {response.status_code}",
+                        message=f"VideoUpscaleReverse: Upscale failed, {response.status_code}",
                         details={"status": response.status_code, "body": content},
                     )
 
@@ -101,20 +90,20 @@ class MediaPostReverse:
                     status = getattr(e, "status_code", None)
                 if status == 401:
                     try:
-                        await TokenService.record_fail(token, status, "media_post_auth_failed")
+                        await TokenService.record_fail(token, status, "video_upscale_auth_failed")
                     except Exception:
                         pass
                 raise
 
             # Handle other non-upstream exceptions
             logger.error(
-                f"MediaPostReverse: Media post create failed, {str(e)}",
+                f"VideoUpscaleReverse: Upscale failed, {str(e)}",
                 extra={"error_type": type(e).__name__},
             )
             raise UpstreamException(
-                message=f"MediaPostReverse: Media post create failed, {str(e)}",
+                message=f"VideoUpscaleReverse: Upscale failed, {str(e)}",
                 details={"status": 502, "error": str(e)},
             )
 
 
-__all__ = ["MediaPostReverse"]
+__all__ = ["VideoUpscaleReverse"]

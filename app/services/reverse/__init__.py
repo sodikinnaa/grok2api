@@ -9,6 +9,7 @@ from .media_post import MediaPostReverse
 from .nsfw_mgmt import NsfwMgmtReverse
 from .rate_limits import RateLimitsReverse
 from .set_birth import SetBirthReverse
+from .video_upscale import VideoUpscaleReverse
 from .ws_livekit import LivekitTokenReverse, LivekitWebSocketReverse
 from .ws_imagine import ImagineWebSocketReverse
 from .utils.headers import build_headers
@@ -24,6 +25,7 @@ __all__ = [
     "NsfwMgmtReverse",
     "RateLimitsReverse",
     "SetBirthReverse",
+    "VideoUpscaleReverse",
     "LivekitTokenReverse",
     "LivekitWebSocketReverse",
     "ImagineWebSocketReverse",

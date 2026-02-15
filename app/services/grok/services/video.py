@@ -4,6 +4,7 @@ Grok video generation service.
 
 import asyncio
 import uuid
+import re
 from typing import Any, AsyncGenerator, AsyncIterable, Optional
 
 import orjson
@@ -31,6 +32,8 @@ from app.services.grok.utils.process import (
 from app.services.grok.utils.retry import rate_limited
 from app.services.reverse.app_chat import AppChatReverse
 from app.services.reverse.media_post import MediaPostReverse
+from app.services.reverse.video_upscale import VideoUpscaleReverse
+from app.services.token.manager import BASIC_POOL_NAME
 
 _VIDEO_SEMAPHORE = None
 _VIDEO_SEM_VALUE = 0
@@ -63,13 +66,17 @@ class VideoService:
             if media_type == "MEDIA_POST_TYPE_IMAGE" and not media_url:
                 raise ValidationException("media_url is required for image posts")
 
+            prompt_value = prompt if media_type == "MEDIA_POST_TYPE_VIDEO" else ""
+            media_value = media_url or ""
+
             async with AsyncSession() as session:
                 async with _get_video_semaphore():
                     response = await MediaPostReverse.request(
                         session,
                         token,
                         media_type,
-                        media_url or "",
+                        media_value,
+                        prompt=prompt_value,
                     )
 
             post_id = response.json().get("post", {}).get("id", "")
@@ -264,6 +271,8 @@ class VideoService:
             token = token_info.token
             if token.startswith("sso="):
                 token = token[4:]
+            pool_name = token_mgr.get_pool_name_for_token(token)
+            should_upscale = resolution == "720p" and pool_name == BASIC_POOL_NAME
 
             try:
                 # Handle image attachments.
@@ -305,12 +314,19 @@ class VideoService:
 
                 # Process response.
                 if is_stream:
-                    processor = VideoStreamProcessor(model, token, show_think)
+                    processor = VideoStreamProcessor(
+                        model,
+                        token,
+                        show_think,
+                        upscale_on_finish=should_upscale,
+                    )
                     return wrap_stream_with_usage(
                         processor.process(response), token_mgr, token, model
                     )
 
-                result = await VideoCollectProcessor(model, token).process(response)
+                result = await VideoCollectProcessor(
+                    model, token, upscale_on_finish=should_upscale
+                ).process(response)
                 try:
                     model_info = ModelService.get(model)
                     effort = (
@@ -350,13 +366,53 @@ class VideoService:
 class VideoStreamProcessor(BaseProcessor):
     """Video stream response processor."""
 
-    def __init__(self, model: str, token: str = "", show_think: bool = None):
+    def __init__(
+        self,
+        model: str,
+        token: str = "",
+        show_think: bool = None,
+        upscale_on_finish: bool = False,
+    ):
         super().__init__(model, token)
         self.response_id: Optional[str] = None
         self.think_opened: bool = False
         self.role_sent: bool = False
 
         self.show_think = bool(show_think)
+        self.upscale_on_finish = bool(upscale_on_finish)
+
+    @staticmethod
+    def _extract_video_id(video_url: str) -> str:
+        if not video_url:
+            return ""
+        match = re.search(r"/generated/([0-9a-fA-F-]{32,36})/", video_url)
+        if match:
+            return match.group(1)
+        match = re.search(r"/([0-9a-fA-F-]{32,36})/generated_video", video_url)
+        if match:
+            return match.group(1)
+        return ""
+
+    async def _upscale_video_url(self, video_url: str) -> str:
+        if not video_url or not self.upscale_on_finish:
+            return video_url
+        video_id = self._extract_video_id(video_url)
+        if not video_id:
+            logger.warning("Video upscale skipped: unable to extract video id")
+            return video_url
+        try:
+            async with AsyncSession() as session:
+                response = await VideoUpscaleReverse.request(
+                    session, self.token, video_id
+                )
+            payload = response.json() if response is not None else {}
+            hd_url = payload.get("hdMediaUrl") if isinstance(payload, dict) else None
+            if hd_url:
+                logger.info(f"Video upscale completed: {hd_url}")
+                return hd_url
+        except Exception as e:
+            logger.warning(f"Video upscale failed: {e}")
+        return video_url
 
     def _sse(self, content: str = "", role: str = None, finish: str = None) -> str:
         """Build SSE response."""
@@ -443,6 +499,9 @@ class VideoStreamProcessor(BaseProcessor):
                             self.think_opened = False
 
                         if video_url:
+                            if self.upscale_on_finish:
+                                yield self._sse("正在对视频进行超分辨率\n")
+                                video_url = await self._upscale_video_url(video_url)
                             dl_service = self._get_dl()
                             rendered = await dl_service.render_video(
                                 video_url, self.token, thumbnail_url
@@ -500,8 +559,42 @@ class VideoStreamProcessor(BaseProcessor):
 class VideoCollectProcessor(BaseProcessor):
     """Video non-stream response processor."""
 
-    def __init__(self, model: str, token: str = ""):
+    def __init__(self, model: str, token: str = "", upscale_on_finish: bool = False):
         super().__init__(model, token)
+        self.upscale_on_finish = bool(upscale_on_finish)
+
+    @staticmethod
+    def _extract_video_id(video_url: str) -> str:
+        if not video_url:
+            return ""
+        match = re.search(r"/generated/([0-9a-fA-F-]{32,36})/", video_url)
+        if match:
+            return match.group(1)
+        match = re.search(r"/([0-9a-fA-F-]{32,36})/generated_video", video_url)
+        if match:
+            return match.group(1)
+        return ""
+
+    async def _upscale_video_url(self, video_url: str) -> str:
+        if not video_url or not self.upscale_on_finish:
+            return video_url
+        video_id = self._extract_video_id(video_url)
+        if not video_id:
+            logger.warning("Video upscale skipped: unable to extract video id")
+            return video_url
+        try:
+            async with AsyncSession() as session:
+                response = await VideoUpscaleReverse.request(
+                    session, self.token, video_id
+                )
+            payload = response.json() if response is not None else {}
+            hd_url = payload.get("hdMediaUrl") if isinstance(payload, dict) else None
+            if hd_url:
+                logger.info(f"Video upscale completed: {hd_url}")
+                return hd_url
+        except Exception as e:
+            logger.warning(f"Video upscale failed: {e}")
+        return video_url
 
     async def process(self, response: AsyncIterable[bytes]) -> dict[str, Any]:
         """Process and collect video response."""
@@ -528,6 +621,8 @@ class VideoCollectProcessor(BaseProcessor):
                         thumbnail_url = video_resp.get("thumbnailImageUrl", "")
 
                         if video_url:
+                            if self.upscale_on_finish:
+                                video_url = await self._upscale_video_url(video_url)
                             dl_service = self._get_dl()
                             content = await dl_service.render_video(
                                 video_url, self.token, thumbnail_url

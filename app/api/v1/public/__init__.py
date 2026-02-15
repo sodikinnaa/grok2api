@@ -3,11 +3,13 @@
 from fastapi import APIRouter
 
 from app.api.v1.public.imagine import router as imagine_router
+from app.api.v1.public.video import router as video_router
 from app.api.v1.public.voice import router as voice_router
 
 router = APIRouter()
 
 router.include_router(imagine_router)
+router.include_router(video_router)
 router.include_router(voice_router)
 
 __all__ = ["router"]
