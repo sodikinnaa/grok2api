@@ -5,7 +5,7 @@
 > [!NOTE]
 > This project is for learning and research only. You must comply with Grok **Terms of Use** and **local laws and regulations**. Do not use for illegal purposes.
 
-Grok2API rebuilt with **FastAPI**, fully aligned with the latest web call format. Supports streaming/non-streaming chat, image generation/editing, video generation/upscale, deep reasoning, token pool concurrency, and automatic load balancing.
+Grok2API rebuilt with **FastAPI**, fully aligned with the latest web call format. Supports streaming/non-streaming chat, image generation/editing, video generation/upscale (text-to-video and image-to-video), deep reasoning, token pool concurrency, and automatic load balancing.
 
 <img width="2480" height="1686" alt="image" src="https://github.com/user-attachments/assets/c85546a2-9729-4e8a-9c4d-6dc16c62b6b4" />
 
@@ -167,6 +167,7 @@ curl http://localhost:8000/v1/chat/completions \
 - `image_url/input_audio/file` only supports URL or Data URI (`data:<mime>;base64,...`); raw base64 will be rejected.
 - `reasoning_effort`: `none` disables thinking output; any other value enables it.
 - `grok-imagine-1.0-edit` requires an image; if multiple are provided, the last image and last text are used.
+- `grok-imagine-1.0-video` supports text-to-video and image-to-video via `image_url`.
 - Any other parameters will be discarded and ignored.
 
 <br>

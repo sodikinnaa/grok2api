@@ -5,7 +5,7 @@
 > [!NOTE]
 > 本项目仅供学习与研究，使用者必须在遵循 Grok 的 **使用条款** 以及 **法律法规** 的情况下使用，不得用于非法用途。
 
-基于 **FastAPI** 重构的 Grok2API，全面适配最新 Web 调用格式，支持流/非流式对话、图像生成/编辑、视频生成/超分、深度思考，号池并发与自动负载均衡一体化。
+基于 **FastAPI** 重构的 Grok2API，全面适配最新 Web 调用格式，支持流/非流式对话、图像生成/编辑、视频生成/超分（文生视频 / 图生视频）、深度思考，号池并发与自动负载均衡一体化。
 
 <img width="2480" height="1686" alt="image" src="https://github.com/user-attachments/assets/c85546a2-9729-4e8a-9c4d-6dc16c62b6b4" />
 
@@ -167,6 +167,7 @@ curl http://localhost:8000/v1/chat/completions \
 - `image_url/input_audio/file` 仅支持 URL 或 Data URI（`data:<mime>;base64,...`），裸 base64 会报错。
 - `reasoning_effort`：`none` 表示不输出思考，其他值都会输出思考内容。
 - `grok-imagine-1.0-edit` 必须提供图片，多图默认取最后一张与最后一个文本。
+- `grok-imagine-1.0-video` 支持文生视频与图生视频（通过 `image_url` 传参考图）。
 - 除上述外的其他参数将自动丢弃并忽略。
 
 <br>
