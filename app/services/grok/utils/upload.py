@@ -142,7 +142,9 @@ class UploadService:
             lock_timeout = max(1, int(get_config("asset.upload_timeout")))
             async with _file_lock(lock_name, timeout=lock_timeout):
                 session = await self.create()
-                response = await session.get(url, timeout=timeout, proxies=proxies)
+                response = await session.get(
+                    url, timeout=timeout, proxies=proxies, stream=True
+                )
                 if response.status_code >= 400:
                     raise UpstreamException(
                         message=f"Failed to fetch: {response.status_code}",
