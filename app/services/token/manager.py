@@ -375,8 +375,12 @@ class TokenManager:
             result = await usage_service.get(token_str)
 
             if result and "remainingTokens" in result:
+                new_quota = result.get("remainingTokens")
+                if new_quota is None:
+                    new_quota = result.get("remainingQueries")
+                if new_quota is None:
+                    return False
                 old_quota = target_token.quota
-                new_quota = result["remainingTokens"]
 
                 target_token.update_quota(new_quota)
                 target_token.record_success(is_usage=is_usage)
@@ -699,7 +703,11 @@ class TokenManager:
                         result = await usage_service.get(token_str)
 
                         if result and "remainingTokens" in result:
-                            new_quota = result["remainingTokens"]
+                            new_quota = result.get("remainingTokens")
+                            if new_quota is None:
+                                new_quota = result.get("remainingQueries")
+                            if new_quota is None:
+                                return {"recovered": False, "expired": False}
                             old_quota = token_info.quota
                             old_status = token_info.status
 

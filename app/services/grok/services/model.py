@@ -164,6 +164,17 @@ class ModelService:
             is_video=False,
         ),
         ModelInfo(
+            model_id="grok-4.20-beta",
+            grok_model="grok-420",
+            model_mode="MODEL_MODE_GROK_420",
+            tier=Tier.BASIC,
+            cost=Cost.LOW,
+            display_name="GROK-4.20-BETA",
+            is_image=False,
+            is_image_edit=False,
+            is_video=False,
+        ),
+        ModelInfo(
             model_id="grok-imagine-1.0",
             grok_model="grok-3",
             model_mode="MODEL_MODE_FAST",
