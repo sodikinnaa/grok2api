@@ -13,13 +13,13 @@ from typing import AsyncIterator, Optional, Tuple
 from urllib.parse import urlparse
 
 import aiofiles
-from curl_cffi.requests import AsyncSession
 
 from app.core.config import get_config
 from app.core.exceptions import AppException, UpstreamException, ValidationException
 from app.core.logger import logger
 from app.core.storage import DATA_DIR
 from app.services.reverse.assets_upload import AssetsUploadReverse
+from app.services.reverse.utils.session import ResettableSession
 from app.services.grok.utils.locks import _get_upload_semaphore, _file_lock
 
 
@@ -27,13 +27,13 @@ class UploadService:
     """Assets upload service."""
 
     def __init__(self):
-        self._session: Optional[AsyncSession] = None
+        self._session: Optional[ResettableSession] = None
         self._chunk_size = 64 * 1024
 
-    async def create(self) -> AsyncSession:
+    async def create(self) -> ResettableSession:
         """Create or reuse a session."""
         if self._session is None:
-            self._session = AsyncSession()
+            self._session = ResettableSession()
         return self._session
 
     async def close(self):

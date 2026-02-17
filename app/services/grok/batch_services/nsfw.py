@@ -5,14 +5,13 @@ Batch NSFW service.
 import asyncio
 from typing import Callable, Awaitable, Dict, Any, Optional
 
-from curl_cffi.requests import AsyncSession
-
 from app.core.logger import logger
 from app.core.config import get_config
 from app.core.exceptions import UpstreamException
 from app.services.reverse.accept_tos import AcceptTosReverse
 from app.services.reverse.nsfw_mgmt import NsfwMgmtReverse
 from app.services.reverse.set_birth import SetBirthReverse
+from app.services.reverse.utils.session import ResettableSession
 from app.core.batch import run_batch
 
 
@@ -44,7 +43,7 @@ class NSFWService:
         async def _enable(token: str):
             try:
                 browser = get_config("proxy.browser")
-                async with AsyncSession(impersonate=browser) as session:
+                async with ResettableSession(impersonate=browser) as session:
                     async def _record_fail(err: UpstreamException, reason: str):
                         status = None
                         if err.details and "status" in err.details:

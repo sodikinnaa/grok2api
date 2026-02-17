@@ -51,7 +51,7 @@
 
   function setStatus(state, text) {
     if (!statusText) return;
-    statusText.textContent = text;
+    statusText.textContent = text || '未连接';
     statusText.classList.remove('connected', 'connecting', 'error');
     if (state) {
       statusText.classList.add(state);
@@ -143,6 +143,17 @@
   }
 
   function updateError(value) {}
+
+  function setImageStatus(item, state, label) {
+    if (!item) return;
+    const statusEl = item.querySelector('.image-status');
+    if (!statusEl) return;
+    statusEl.textContent = label;
+    statusEl.classList.remove('running', 'done', 'error');
+    if (state) {
+      statusEl.classList.add(state);
+    }
+  }
 
   function isLikelyBase64(raw) {
     if (!raw) return false;
@@ -325,6 +336,11 @@
     metaBar.className = 'waterfall-meta';
     const left = document.createElement('div');
     left.textContent = meta && meta.sequence ? `#${meta.sequence}` : '#';
+    const rightWrap = document.createElement('div');
+    rightWrap.className = 'meta-right';
+    const status = document.createElement('span');
+    status.className = 'image-status done';
+    status.textContent = '完成';
     const right = document.createElement('span');
     if (meta && meta.elapsed_ms) {
       right.textContent = `${meta.elapsed_ms}ms`;
@@ -332,8 +348,10 @@
       right.textContent = '';
     }
 
+    rightWrap.appendChild(status);
+    rightWrap.appendChild(right);
     metaBar.appendChild(left);
-    metaBar.appendChild(right);
+    metaBar.appendChild(rightWrap);
 
     item.appendChild(checkbox);
     item.appendChild(img);
@@ -432,14 +450,21 @@
       metaBar.className = 'waterfall-meta';
       const left = document.createElement('div');
       left.textContent = `#${sequence}`;
+      const rightWrap = document.createElement('div');
+      rightWrap.className = 'meta-right';
+      const status = document.createElement('span');
+      status.className = `image-status ${isFinal ? 'done' : 'running'}`;
+      status.textContent = isFinal ? '完成' : '生成中';
       const right = document.createElement('span');
       right.textContent = '';
       if (meta && meta.elapsed_ms) {
         right.textContent = `${meta.elapsed_ms}ms`;
       }
 
+      rightWrap.appendChild(status);
+      rightWrap.appendChild(right);
       metaBar.appendChild(left);
-      metaBar.appendChild(right);
+      metaBar.appendChild(rightWrap);
 
       item.appendChild(checkbox);
       item.appendChild(img);
@@ -471,12 +496,13 @@
         img.src = dataUrl;
       }
       item.dataset.imageUrl = dataUrl;
-      const right = item.querySelector('.waterfall-meta span');
+      const right = item.querySelector('.waterfall-meta .meta-right span:last-child');
       if (right && meta && meta.elapsed_ms) {
         right.textContent = `${meta.elapsed_ms}ms`;
       }
     }
 
+    setImageStatus(item, isFinal ? 'done' : 'running', isFinal ? '完成' : '生成中');
     updateError('');
 
     if (isNew && autoScrollToggle && autoScrollToggle.checked) {
@@ -537,6 +563,10 @@
       }
     } else if (data.type === 'error' || data.error) {
       const message = data.message || (data.error && data.error.message) || '生成失败';
+      const errorImageId = data.image_id || data.imageId;
+      if (errorImageId && streamImageMap.has(errorImageId)) {
+        setImageStatus(streamImageMap.get(errorImageId), 'error', '失败');
+      }
       updateError(message);
       toast(message, 'error');
     }

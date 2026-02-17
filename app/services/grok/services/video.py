@@ -8,7 +8,6 @@ import re
 from typing import Any, AsyncGenerator, AsyncIterable, Optional
 
 import orjson
-from curl_cffi.requests import AsyncSession
 from curl_cffi.requests.errors import RequestsError
 
 from app.core.logger import logger
@@ -33,6 +32,7 @@ from app.services.grok.utils.retry import rate_limited
 from app.services.reverse.app_chat import AppChatReverse
 from app.services.reverse.media_post import MediaPostReverse
 from app.services.reverse.video_upscale import VideoUpscaleReverse
+from app.services.reverse.utils.session import ResettableSession
 from app.services.token.manager import BASIC_POOL_NAME
 
 _VIDEO_SEMAPHORE = None
@@ -69,7 +69,7 @@ class VideoService:
             prompt_value = prompt if media_type == "MEDIA_POST_TYPE_VIDEO" else ""
             media_value = media_url or ""
 
-            async with AsyncSession() as session:
+            async with ResettableSession() as session:
                 async with _get_video_semaphore():
                     response = await MediaPostReverse.request(
                         session,
@@ -131,7 +131,7 @@ class VideoService:
         }
 
         async def _stream():
-            session = AsyncSession()
+            session = ResettableSession()
             try:
                 async with _get_video_semaphore():
                     stream_response = await AppChatReverse.request(
@@ -191,7 +191,7 @@ class VideoService:
         }
 
         async def _stream():
-            session = AsyncSession()
+            session = ResettableSession()
             try:
                 async with _get_video_semaphore():
                     stream_response = await AppChatReverse.request(
@@ -401,7 +401,7 @@ class VideoStreamProcessor(BaseProcessor):
             logger.warning("Video upscale skipped: unable to extract video id")
             return video_url
         try:
-            async with AsyncSession() as session:
+            async with ResettableSession() as session:
                 response = await VideoUpscaleReverse.request(
                     session, self.token, video_id
                 )
@@ -583,7 +583,7 @@ class VideoCollectProcessor(BaseProcessor):
             logger.warning("Video upscale skipped: unable to extract video id")
             return video_url
         try:
-            async with AsyncSession() as session:
+            async with ResettableSession() as session:
                 response = await VideoUpscaleReverse.request(
                     session, self.token, video_id
                 )

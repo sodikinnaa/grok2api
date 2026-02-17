@@ -3,6 +3,7 @@ Reverse retry utilities.
 """
 
 import asyncio
+import inspect
 import random
 from typing import Callable, Any, Optional
 
@@ -122,7 +123,7 @@ async def retry_on_status(
     func: Callable,
     *args,
     extract_status: Callable[[Exception], Optional[int]] = None,
-    on_retry: Callable[[int, int, Exception, float], None] = None,
+    on_retry: Callable[[int, int, Exception, float], Any] = None,
     **kwargs,
 ) -> Any:
     """
@@ -132,7 +133,8 @@ async def retry_on_status(
         func: Retry function
         *args: Function arguments
         extract_status: Function to extract status code from exception
-        on_retry: Callback function for retry (attempt, status_code, error, delay)
+        on_retry: Callback function for retry (attempt, status_code, error, delay).
+            Can be sync or async.
         **kwargs: Function keyword arguments
 
     Returns:
@@ -204,7 +206,9 @@ async def retry_on_status(
 
                 # Callback
                 if on_retry:
-                    on_retry(ctx.attempt, status_code, e, delay)
+                    result = on_retry(ctx.attempt, status_code, e, delay)
+                    if inspect.isawaitable(result):
+                        await result
 
                 await asyncio.sleep(delay)
                 continue

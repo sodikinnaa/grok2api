@@ -8,7 +8,6 @@ import uuid
 from typing import Dict, List, Any, AsyncGenerator, AsyncIterable
 
 import orjson
-from curl_cffi.requests import AsyncSession
 from curl_cffi.requests.errors import RequestsError
 
 from app.core.logger import logger
@@ -25,6 +24,7 @@ from app.services.grok.utils.upload import UploadService
 from app.services.grok.utils import process as proc_base
 from app.services.grok.utils.retry import pick_token, rate_limited
 from app.services.reverse.app_chat import AppChatReverse
+from app.services.reverse.utils.session import ResettableSession
 from app.services.grok.utils.stream import wrap_stream_with_usage
 from app.services.token import get_token_manager, EffortType
 
@@ -190,7 +190,7 @@ class GrokChatService:
         browser = get_config("proxy.browser")
 
         async def _stream():
-            session = AsyncSession(impersonate=browser)
+            session = ResettableSession(impersonate=browser)
             try:
                 async with _get_chat_semaphore():
                     stream_response = await AppChatReverse.request(
