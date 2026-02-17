@@ -33,6 +33,63 @@ _CHAT_SEMAPHORE = None
 _CHAT_SEM_VALUE = None
 
 
+def extract_tool_text(raw: str, rollout_id: str = "") -> str:
+    if not raw:
+        return ""
+    name_match = re.search(
+        r"<xai:tool_name>(.*?)</xai:tool_name>", raw, flags=re.DOTALL
+    )
+    args_match = re.search(
+        r"<xai:tool_args>(.*?)</xai:tool_args>", raw, flags=re.DOTALL
+    )
+
+    name = name_match.group(1) if name_match else ""
+    if name:
+        name = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", name, flags=re.DOTALL).strip()
+
+    args = args_match.group(1) if args_match else ""
+    if args:
+        args = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", args, flags=re.DOTALL).strip()
+
+    payload = None
+    if args:
+        try:
+            payload = orjson.loads(args)
+        except orjson.JSONDecodeError:
+            payload = None
+
+    label = name
+    text = args
+    prefix = f"[{rollout_id}]" if rollout_id else ""
+
+    if name == "web_search":
+        label = f"{prefix}[WebSearch]"
+        if isinstance(payload, dict):
+            text = payload.get("query") or payload.get("q") or ""
+    elif name == "search_images":
+        label = f"{prefix}[SearchImage]"
+        if isinstance(payload, dict):
+            text = (
+                payload.get("image_description")
+                or payload.get("description")
+                or payload.get("query")
+                or ""
+            )
+    elif name == "chatroom_send":
+        label = f"{prefix}[AgentThink]"
+        if isinstance(payload, dict):
+            text = payload.get("message") or ""
+
+    if label and text:
+        return f"{label} {text}".strip()
+    if label:
+        return label
+    if text:
+        return text
+    # Fallback: strip tags to keep any raw text.
+    return re.sub(r"<[^>]+>", "", raw, flags=re.DOTALL).strip()
+
+
 def _get_chat_semaphore() -> asyncio.Semaphore:
     global _CHAT_SEMAPHORE, _CHAT_SEM_VALUE
     value = max(1, int(get_config("chat.concurrent")))
@@ -115,7 +172,7 @@ class GrokChatService:
         self,
         token: str,
         message: str,
-        model: str = "grok-3",
+        model: str,
         mode: str = None,
         stream: bool = None,
         file_attachments: List[str] = None,
@@ -338,18 +395,86 @@ class StreamProcessor(proc_base.BaseProcessor):
         super().__init__(model, token)
         self.response_id: str = None
         self.fingerprint: str = ""
+        self.rollout_id: str = ""
         self.think_opened: bool = False
         self.role_sent: bool = False
         self.filter_tags = get_config("app.filter_tags")
+        self.tool_usage_enabled = (
+            "xai:tool_usage_card" in (self.filter_tags or [])
+        )
+        self._tool_usage_opened = False
+        self._tool_usage_buffer = ""
 
         self.show_think = bool(show_think)
 
+    def _filter_tool_card(self, token: str) -> str:
+        if not token or not self.tool_usage_enabled:
+            return token
+
+        output_parts: list[str] = []
+        rest = token
+        start_tag = "<xai:tool_usage_card"
+        end_tag = "</xai:tool_usage_card>"
+
+        while rest:
+            if self._tool_usage_opened:
+                end_idx = rest.find(end_tag)
+                if end_idx == -1:
+                    self._tool_usage_buffer += rest
+                    return "".join(output_parts)
+                end_pos = end_idx + len(end_tag)
+                self._tool_usage_buffer += rest[:end_pos]
+                line = extract_tool_text(self._tool_usage_buffer, self.rollout_id)
+                if line:
+                    if output_parts and not output_parts[-1].endswith("\n"):
+                        output_parts[-1] += "\n"
+                    output_parts.append(f"{line}\n")
+                self._tool_usage_buffer = ""
+                self._tool_usage_opened = False
+                rest = rest[end_pos:]
+                continue
+
+            start_idx = rest.find(start_tag)
+            if start_idx == -1:
+                output_parts.append(rest)
+                break
+
+            if start_idx > 0:
+                output_parts.append(rest[:start_idx])
+
+            end_idx = rest.find(end_tag, start_idx)
+            if end_idx == -1:
+                self._tool_usage_opened = True
+                self._tool_usage_buffer = rest[start_idx:]
+                break
+
+            end_pos = end_idx + len(end_tag)
+            raw_card = rest[start_idx:end_pos]
+            line = extract_tool_text(raw_card, self.rollout_id)
+            if line:
+                if output_parts and not output_parts[-1].endswith("\n"):
+                    output_parts[-1] += "\n"
+                output_parts.append(f"{line}\n")
+            rest = rest[end_pos:]
+
+        return "".join(output_parts)
+
     def _filter_token(self, token: str) -> str:
         """Filter special tags in current token only."""
-        if not self.filter_tags or not token:
+        if not token:
+            return token
+
+        if self.tool_usage_enabled:
+            token = self._filter_tool_card(token)
+            if not token:
+                return ""
+
+        if not self.filter_tags:
             return token
 
         for tag in self.filter_tags:
+            if tag == "xai:tool_usage_card":
+                continue
             if f"<{tag}" in token or f"</{tag}" in token:
                 return ""
 
@@ -408,6 +533,8 @@ class StreamProcessor(proc_base.BaseProcessor):
                     self.fingerprint = llm.get("modelHash", "")
                 if rid := resp.get("responseId"):
                     self.response_id = rid
+                if rid := resp.get("rolloutId"):
+                    self.rollout_id = str(rid)
 
                 if not self.role_sent:
                     yield self._sse(role="assistant")
@@ -537,7 +664,28 @@ class CollectProcessor(proc_base.BaseProcessor):
             return content
 
         result = content
+        if "xai:tool_usage_card" in self.filter_tags:
+            rollout_id = ""
+            rollout_match = re.search(
+                r"<rolloutId>(.*?)</rolloutId>", result, flags=re.DOTALL
+            )
+            if rollout_match:
+                rollout_id = rollout_match.group(1).strip()
+
+            result = re.sub(
+                r"<xai:tool_usage_card[^>]*>.*?</xai:tool_usage_card>",
+                lambda match: (
+                    f"{extract_tool_text(match.group(0), rollout_id)}\n"
+                    if extract_tool_text(match.group(0), rollout_id)
+                    else ""
+                ),
+                result,
+                flags=re.DOTALL,
+            )
+
         for tag in self.filter_tags:
+            if tag == "xai:tool_usage_card":
+                continue
             pattern = rf"<{re.escape(tag)}[^>]*>.*?</{re.escape(tag)}>|<{re.escape(tag)}[^>]*/>"
             result = re.sub(pattern, "", result, flags=re.DOTALL)
 

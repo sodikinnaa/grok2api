@@ -46,7 +46,11 @@ class UsageService:
                 async with AsyncSession() as session:
                     response = await RateLimitsReverse.request(session, token)
                 data = response.json()
-                remaining = data.get("remainingTokens", 0)
+                remaining = data.get("remainingTokens")
+                if remaining is None:
+                    remaining = data.get("remainingQueries")
+                    if remaining is not None:
+                        data["remainingTokens"] = remaining
                 logger.info(
                     f"Usage sync success: remaining={remaining}, token={token[:10]}..."
                 )
