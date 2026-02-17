@@ -98,7 +98,7 @@ class DownloadService:
         if thumbnail_url:
             final_thumb_url = await self.resolve_url(thumbnail_url, token, "image")
         if fmt == "url":
-            return final_video_url
+            return f"{final_video_url}\n"
         if fmt == "markdown":
             return f"[video]({final_video_url})"
         import html
