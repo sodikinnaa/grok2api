@@ -33,7 +33,7 @@ _CHAT_SEMAPHORE = None
 _CHAT_SEM_VALUE = None
 
 
-def extract_tool_text(raw: str) -> str:
+def extract_tool_text(raw: str, rollout_id: str = "") -> str:
     if not raw:
         return ""
     name_match = re.search(
@@ -60,12 +60,14 @@ def extract_tool_text(raw: str) -> str:
 
     label = name
     text = args
+    prefix = f"[{rollout_id}]" if rollout_id else ""
+
     if name == "web_search":
-        label = "[WebSearch]"
+        label = f"{prefix}[WebSearch]"
         if isinstance(payload, dict):
             text = payload.get("query") or payload.get("q") or ""
     elif name == "search_images":
-        label = "[SearchImage]"
+        label = f"{prefix}[SearchImage]"
         if isinstance(payload, dict):
             text = (
                 payload.get("image_description")
@@ -74,7 +76,7 @@ def extract_tool_text(raw: str) -> str:
                 or ""
             )
     elif name == "chatroom_send":
-        label = "[AgentThink]"
+        label = f"{prefix}[AgentThink]"
         if isinstance(payload, dict):
             text = payload.get("message") or ""
 
@@ -393,6 +395,7 @@ class StreamProcessor(proc_base.BaseProcessor):
         super().__init__(model, token)
         self.response_id: str = None
         self.fingerprint: str = ""
+        self.rollout_id: str = ""
         self.think_opened: bool = False
         self.role_sent: bool = False
         self.filter_tags = get_config("app.filter_tags")
@@ -421,7 +424,7 @@ class StreamProcessor(proc_base.BaseProcessor):
                     return "".join(output_parts)
                 end_pos = end_idx + len(end_tag)
                 self._tool_usage_buffer += rest[:end_pos]
-                line = extract_tool_text(self._tool_usage_buffer)
+                line = extract_tool_text(self._tool_usage_buffer, self.rollout_id)
                 if line:
                     if output_parts and not output_parts[-1].endswith("\n"):
                         output_parts[-1] += "\n"
@@ -447,7 +450,7 @@ class StreamProcessor(proc_base.BaseProcessor):
 
             end_pos = end_idx + len(end_tag)
             raw_card = rest[start_idx:end_pos]
-            line = extract_tool_text(raw_card)
+            line = extract_tool_text(raw_card, self.rollout_id)
             if line:
                 if output_parts and not output_parts[-1].endswith("\n"):
                     output_parts[-1] += "\n"
@@ -530,6 +533,8 @@ class StreamProcessor(proc_base.BaseProcessor):
                     self.fingerprint = llm.get("modelHash", "")
                 if rid := resp.get("responseId"):
                     self.response_id = rid
+                if rid := resp.get("rolloutId"):
+                    self.rollout_id = str(rid)
 
                 if not self.role_sent:
                     yield self._sse(role="assistant")
@@ -660,11 +665,18 @@ class CollectProcessor(proc_base.BaseProcessor):
 
         result = content
         if "xai:tool_usage_card" in self.filter_tags:
+            rollout_id = ""
+            rollout_match = re.search(
+                r"<rolloutId>(.*?)</rolloutId>", result, flags=re.DOTALL
+            )
+            if rollout_match:
+                rollout_id = rollout_match.group(1).strip()
+
             result = re.sub(
                 r"<xai:tool_usage_card[^>]*>.*?</xai:tool_usage_card>",
                 lambda match: (
-                    f"{extract_tool_text(match.group(0))}\n"
-                    if extract_tool_text(match.group(0))
+                    f"{extract_tool_text(match.group(0), rollout_id)}\n"
+                    if extract_tool_text(match.group(0), rollout_id)
                     else ""
                 ),
                 result,
