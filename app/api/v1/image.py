@@ -36,6 +36,7 @@ SIZE_TO_ASPECT = {
     "1024x1792": "2:3",
     "1024x1024": "1:1",
 }
+ALLOWED_ASPECT_RATIOS = {"1:1", "2:3", "3:2", "9:16", "16:9"}
 
 
 class ImageGenerationRequest(BaseModel):
@@ -169,8 +170,23 @@ def response_field_name(response_format: str) -> str:
 
 def resolve_aspect_ratio(size: str) -> str:
     """Map OpenAI size to Grok Imagine aspect ratio."""
-    size = (size or "").strip()
-    return SIZE_TO_ASPECT.get(size) or "2:3"
+    value = (size or "").strip()
+    if not value:
+        return "2:3"
+    if value in SIZE_TO_ASPECT:
+        return SIZE_TO_ASPECT[value]
+    if ":" in value:
+        try:
+            left, right = value.split(":", 1)
+            left_i = int(left.strip())
+            right_i = int(right.strip())
+            if left_i > 0 and right_i > 0:
+                ratio = f"{left_i}:{right_i}"
+                if ratio in ALLOWED_ASPECT_RATIOS:
+                    return ratio
+        except (TypeError, ValueError):
+            pass
+    return "2:3"
 
 
 def validate_edit_request(request: ImageEditRequest, images: List[UploadFile]):
