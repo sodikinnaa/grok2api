@@ -318,6 +318,7 @@ curl http://localhost:8000/v1/images/edits \
 |  | `super_refresh_interval_hours` | Super 刷新间隔 | Super Token 刷新的时间间隔（小时）。 | `2` |
 |  | `fail_threshold` | 失败阈值 | 单个 Token 连续失败多少次后被标记为不可用。 | `5` |
 |  | `save_delay_ms` | 保存延迟 | Token 变更合并写入的延迟（毫秒）。 | `500` |
+|  | `usage_flush_interval_sec` | 用量落库间隔 | 用量类字段写入数据库的最小间隔（秒）。 | `5` |
 |  | `reload_interval_sec` | 同步间隔 | 多 worker 场景下 Token 状态刷新间隔（秒）。 | `30` |
 | **cache** | `enable_auto_clean` | 自动清理 | 是否启用缓存自动清理，开启后按上限自动回收。 | `true` |
 |  | `limit_mb` | 清理阈值 | 缓存大小阈值（MB），超过阈值会触发清理。 | `1024` |

@@ -173,7 +173,7 @@ async def refresh_tokens_async(data: dict):
                     fail_count += 1
                     results[token] = False
 
-            await mgr._save()
+            await mgr._save(force=True)
 
             result = {
                 "status": "success",
@@ -367,7 +367,7 @@ async def enable_nsfw_async(data: dict):
                     fail_count += 1
                     results[masked] = res.get("data") or {"error": res.get("error")}
 
-            await mgr._save()
+            await mgr._save(force=True)
 
             result = {
                 "status": "success",

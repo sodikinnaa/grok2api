@@ -318,6 +318,7 @@ Config file: `data/config.toml`
 |  | `super_refresh_interval_hours` | Super refresh interval | Super token refresh interval (hours). | `2` |
 |  | `fail_threshold` | Fail threshold | Consecutive failures to disable. | `5` |
 |  | `save_delay_ms` | Save delay | Merge write delay (ms). | `500` |
+|  | `usage_flush_interval_sec` | Usage flush interval | Minimum interval to flush usage fields to DB (seconds). | `5` |
 |  | `reload_interval_sec` | Reload interval | Multi-worker token reload interval (seconds). | `30` |
 | **cache** | `enable_auto_clean` | Auto clean | Enable cache auto cleanup. | `true` |
 |  | `limit_mb` | Size limit | Cleanup threshold (MB). | `1024` |
