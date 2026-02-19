@@ -1,6 +1,6 @@
 [project]
 name = "grok2api"
-version = "0.3.1"
+version = "0.3.2"
 description = "Grok2API rebuilt with FastAPI, fully aligned with the latest web call format. Supports streaming and non-streaming chat, image generation/editing, deep thinking, token pool concurrency, and automatic load balancing."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -10,6 +10,7 @@ dependencies = [
     "aiohttp-socks>=0.11.0",
     "aiomysql>=0.2.0",
     "asyncpg>=0.31.0",
+    "cryptography>=46.0.5",
     "curl-cffi>=0.13.0",
     "fastapi>=0.119.0",
     "greenlet>=3.3.1",

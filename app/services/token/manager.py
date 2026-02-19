@@ -27,6 +27,7 @@ DEFAULT_SUPER_REFRESH_INTERVAL_HOURS = 2
 DEFAULT_REFRESH_INTERVAL_HOURS = 8
 DEFAULT_RELOAD_INTERVAL_SEC = 30
 DEFAULT_SAVE_DELAY_MS = 500
+DEFAULT_USAGE_FLUSH_INTERVAL_SEC = 5
 
 SUPER_POOL_NAME = "ssoSuper"
 BASIC_POOL_NAME = "ssoBasic"
@@ -52,6 +53,13 @@ class TokenManager:
         self._save_task: Optional[asyncio.Task] = None
         self._save_delay = DEFAULT_SAVE_DELAY_MS / 1000.0
         self._last_reload_at = 0.0
+        self._has_state_changes = False
+        self._has_usage_changes = False
+        self._state_change_seq = 0
+        self._usage_change_seq = 0
+        self._last_usage_flush_at = 0.0
+        self._dirty_tokens = {}
+        self._dirty_deletes = set()
 
     @classmethod
     async def get_instance(cls) -> "TokenManager":
@@ -140,19 +148,112 @@ class TokenManager:
             return
         await self.reload()
 
-    async def _save(self):
+    def _mark_state_change(self):
+        self._has_state_changes = True
+        self._state_change_seq += 1
+
+    def _mark_usage_change(self):
+        self._has_usage_changes = True
+        self._usage_change_seq += 1
+
+    def _track_token_change(
+        self, token: TokenInfo, pool_name: str, change_kind: str
+    ):
+        token_key = token.token
+        if token_key.startswith("sso="):
+            token_key = token_key[4:]
+        if token_key in self._dirty_deletes:
+            self._dirty_deletes.remove(token_key)
+        existing = self._dirty_tokens.get(token_key)
+        if existing and existing[1] == "state":
+            change_kind = "state"
+        self._dirty_tokens[token_key] = (pool_name, change_kind)
+        if change_kind == "state":
+            self._mark_state_change()
+        else:
+            self._mark_usage_change()
+
+    def _track_token_delete(self, token_str: str):
+        token_key = token_str
+        if token_key.startswith("sso="):
+            token_key = token_key[4:]
+        self._dirty_deletes.add(token_key)
+        if token_key in self._dirty_tokens:
+            del self._dirty_tokens[token_key]
+        self._mark_state_change()
+
+    async def _save(self, force: bool = False):
         """保存变更"""
         async with self._save_lock:
             try:
-                data = {}
-                for pool_name, pool in self.pools.items():
-                    data[pool_name] = [info.model_dump() for info in pool.list()]
+                if not self._dirty_tokens and not self._dirty_deletes:
+                    return
+
+                if not force and not self._has_state_changes:
+                    interval_sec = get_config(
+                        "token.usage_flush_interval_sec",
+                        DEFAULT_USAGE_FLUSH_INTERVAL_SEC,
+                    )
+                    try:
+                        interval_sec = float(interval_sec)
+                    except Exception:
+                        interval_sec = float(DEFAULT_USAGE_FLUSH_INTERVAL_SEC)
+                    if interval_sec > 0:
+                        now = time.monotonic()
+                        if now - self._last_usage_flush_at < interval_sec:
+                            self._dirty = True
+                            return
+
+                state_seq = self._state_change_seq
+                usage_seq = self._usage_change_seq
+
+                dirty_tokens = self._dirty_tokens
+                dirty_deletes = self._dirty_deletes
+                self._dirty_tokens = {}
+                self._dirty_deletes = set()
+
+                updates = []
+                deleted = list(dirty_deletes)
+                for token_key, meta in dirty_tokens.items():
+                    if token_key in dirty_deletes:
+                        continue
+                    pool_name, change_kind = meta
+                    pool = self.pools.get(pool_name)
+                    if not pool:
+                        continue
+                    info = pool.get(token_key)
+                    if not info:
+                        continue
+                    payload = info.model_dump()
+                    payload["pool_name"] = pool_name
+                    payload["_update_kind"] = change_kind
+                    updates.append(payload)
 
                 storage = get_storage()
                 async with storage.acquire_lock("tokens_save", timeout=10):
-                    await storage.save_tokens(data)
+                    await storage.save_tokens_delta(updates, deleted)
+
+                if state_seq == self._state_change_seq:
+                    self._has_state_changes = False
+                if usage_seq == self._usage_change_seq:
+                    self._has_usage_changes = False
+                    self._last_usage_flush_at = time.monotonic()
             except Exception as e:
                 logger.error(f"Failed to save tokens: {e}")
+                self._dirty = True
+                if 'dirty_tokens' in locals():
+                    for token_key, meta in dirty_tokens.items():
+                        existing = self._dirty_tokens.get(token_key)
+                        if existing and existing[1] == "state":
+                            continue
+                        if meta[1] == "state" and existing:
+                            self._dirty_tokens[token_key] = (meta[0], "state")
+                        else:
+                            self._dirty_tokens[token_key] = meta
+                    self._dirty_deletes.update(dirty_deletes)
+                    for token_key in dirty_deletes:
+                        if token_key in self._dirty_tokens:
+                            del self._dirty_tokens[token_key]
 
     def _schedule_save(self):
         """合并高频保存请求，减少写入开销"""
@@ -325,10 +426,13 @@ class TokenManager:
         for pool in self.pools.values():
             token = pool.get(raw_token)
             if token:
+                old_status = token.status
                 consumed = token.consume(effort)
                 logger.debug(
                     f"Token {raw_token[:10]}...: consumed {consumed} quota, use_count={token.use_count}"
                 )
+                change_kind = "state" if token.status != old_status else "usage"
+                self._track_token_change(token, pool.name, change_kind)
                 self._schedule_save()
                 return True
 
@@ -360,9 +464,11 @@ class TokenManager:
 
         # 查找 Token 对象
         target_token: Optional[TokenInfo] = None
+        target_pool_name: Optional[str] = None
         for pool in self.pools.values():
             target_token = pool.get(raw_token)
             if target_token:
+                target_pool_name = pool.name
                 break
 
         if not target_token:
@@ -381,6 +487,7 @@ class TokenManager:
                 if new_quota is None:
                     return False
                 old_quota = target_token.quota
+                old_status = target_token.status
 
                 target_token.update_quota(new_quota)
                 target_token.record_success(is_usage=is_usage)
@@ -391,6 +498,11 @@ class TokenManager:
                     f"{old_quota} -> {new_quota} (consumed: {consumed}, use_count: {target_token.use_count})"
                 )
 
+                if target_pool_name:
+                    change_kind = "state" if target_token.status != old_status else "usage"
+                    self._track_token_change(
+                        target_token, target_pool_name, change_kind
+                    )
                 self._schedule_save()
                 return True
 
@@ -450,11 +562,12 @@ class TokenManager:
                         f"Token {raw_token[:10]}...: recorded {status_code} failure "
                         f"({token.fail_count}/{threshold}) - {reason}"
                     )
+                    self._track_token_change(token, pool.name, "state")
+                    self._schedule_save()
                 else:
                     logger.info(
                         f"Token {raw_token[:10]}...: non-auth error ({status_code}) - {reason} (not counted)"
                     )
-                self._schedule_save()
                 return True
 
         logger.warning(f"Token {raw_token[:10]}...: not found for failure record")
@@ -485,6 +598,7 @@ class TokenManager:
                     f"Token {raw_token[:10]}...: marked as rate limited "
                     f"(quota {old_quota} -> 0, status -> cooling)"
                 )
+                self._track_token_change(token, pool.name, "state")
                 self._schedule_save()
                 return True
 
@@ -515,8 +629,10 @@ class TokenManager:
             logger.warning(f"Pool '{pool_name}': token already exists")
             return False
 
-        pool.add(TokenInfo(token=token, quota=_default_quota_for_pool(pool_name)))
-        await self._save()
+        token_info = TokenInfo(token=token, quota=_default_quota_for_pool(pool_name))
+        pool.add(token_info)
+        self._track_token_change(token_info, pool_name, "state")
+        await self._save(force=True)
         logger.info(f"Pool '{pool_name}': token added")
         return True
 
@@ -527,6 +643,7 @@ class TokenManager:
             info = pool.get(raw_token)
             if info:
                 info.last_asset_clear_at = int(datetime.now().timestamp() * 1000)
+                self._track_token_change(info, pool.name, "state")
                 self._schedule_save()
                 return True
         return False
@@ -548,6 +665,7 @@ class TokenManager:
             if info:
                 if tag not in info.tags:
                     info.tags.append(tag)
+                    self._track_token_change(info, pool.name, "state")
                     self._schedule_save()
                     logger.debug(f"Token {raw_token[:10]}...: added tag '{tag}'")
                 return True
@@ -570,6 +688,7 @@ class TokenManager:
             if info:
                 if tag in info.tags:
                     info.tags.remove(tag)
+                    self._track_token_change(info, pool.name, "state")
                     self._schedule_save()
                     logger.debug(f"Token {raw_token[:10]}...: removed tag '{tag}'")
                 return True
@@ -587,7 +706,8 @@ class TokenManager:
         """
         for pool_name, pool in self.pools.items():
             if pool.remove(token):
-                await self._save()
+                self._track_token_delete(token)
+                await self._save(force=True)
                 logger.info(f"Pool '{pool_name}': token removed")
                 return True
 
@@ -601,9 +721,10 @@ class TokenManager:
             default_quota = _default_quota_for_pool(pool_name)
             for token in pool:
                 token.reset(default_quota)
+                self._track_token_change(token, pool_name, "state")
                 count += 1
 
-        await self._save()
+        await self._save(force=True)
         logger.info(f"Reset all: {count} tokens updated")
 
     async def reset_token(self, token_str: str) -> bool:
@@ -623,7 +744,8 @@ class TokenManager:
             if token:
                 default_quota = _default_quota_for_pool(pool.name)
                 token.reset(default_quota)
-                await self._save()
+                self._track_token_change(token, pool.name, "state")
+                await self._save(force=True)
                 logger.info(f"Token {raw_token[:10]}...: reset completed")
                 return True
 
@@ -661,7 +783,7 @@ class TokenManager:
             {"checked": int, "refreshed": int, "recovered": int, "expired": int}
         """
         # 收集需要刷新的 token
-        to_refresh: List[TokenInfo] = []
+        to_refresh: List[tuple[str, TokenInfo]] = []
         for pool in self.pools.values():
             if pool.name == SUPER_POOL_NAME:
                 interval_hours = get_config(
@@ -675,7 +797,7 @@ class TokenManager:
                 )
             for token in pool:
                 if token.need_refresh(interval_hours):
-                    to_refresh.append(token)
+                    to_refresh.append((pool.name, token))
 
         if not to_refresh:
             logger.debug("Refresh check: no tokens need refresh")
@@ -690,8 +812,9 @@ class TokenManager:
         recovered = 0
         expired = 0
 
-        async def _refresh_one(token_info: TokenInfo) -> dict:
+        async def _refresh_one(item: tuple[str, TokenInfo]) -> dict:
             """刷新单个 token"""
+            _, token_info = item
             async with semaphore:
                 token_str = token_info.token
                 if token_str.startswith("sso="):
@@ -766,7 +889,9 @@ class TokenManager:
             if i + DEFAULT_REFRESH_BATCH_SIZE < len(to_refresh):
                 await asyncio.sleep(1)
 
-        await self._save()
+        for pool_name, token_info in to_refresh:
+            self._track_token_change(token_info, pool_name, "state")
+        await self._save(force=True)
 
         logger.info(
             f"Refresh completed: "
