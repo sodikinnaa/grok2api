@@ -208,7 +208,7 @@
         }
       }
 
-      const ulMatch = trimmed.match(/^[-*]\s+(.*)$/);
+      const ulMatch = trimmed.match(/^[-*+•·]\s+(.*)$/);
       if (ulMatch) {
         flushParagraph();
         if (!inUl) {
@@ -221,7 +221,7 @@
         continue;
       }
 
-      const olMatch = trimmed.match(/^\d+\.\s+(.*)$/);
+      const olMatch = trimmed.match(/^\d+[.)、]\s+(.*)$/);
       if (olMatch) {
         flushParagraph();
         if (!inOl) {
@@ -346,7 +346,9 @@
         const items = group.items.map((item) => {
           const body = renderBasicMarkdown(item.lines.join('\n').trim());
           const typeText = escapeHtml(item.type);
-          return `<div class="think-item-row"><div class="think-item-type">${typeText}</div><div class="think-item-body">${body || '<em>（空）</em>'}</div></div>`;
+          const typeKey = String(item.type || '').trim().toLowerCase().replace(/\s+/g, '');
+          const typeAttr = escapeHtml(typeKey);
+          return `<div class="think-item-row"><div class="think-item-type" data-type="${typeAttr}">${typeText}</div><div class="think-item-body">${body || '<em>（空）</em>'}</div></div>`;
         }).join('');
         const title = escapeHtml(group.id);
         const openAttr = openAllGroups ? ' open' : '';
@@ -467,51 +469,60 @@
       return null;
     };
 
-    const children = Array.from(root.childNodes);
-    let group = [];
-    let groupStart = null;
-    let removeNodes = [];
+    const wrapImagesInContainer = (container) => {
+      const children = Array.from(container.childNodes);
+      let group = [];
+      let groupStart = null;
+      let removeNodes = [];
 
-    const flush = () => {
-      if (group.length < 2) {
+      const flush = () => {
+        if (group.length < 2) {
+          group = [];
+          groupStart = null;
+          removeNodes = [];
+          return;
+        }
+        const wrapper = document.createElement('div');
+        wrapper.className = 'img-grid';
+        const cols = Math.min(4, group.length);
+        wrapper.style.setProperty('--cols', String(cols));
+        if (groupStart) {
+          container.insertBefore(wrapper, groupStart);
+        } else {
+          container.appendChild(wrapper);
+        }
+        group.forEach((img) => wrapper.appendChild(img));
+        removeNodes.forEach((n) => n.parentNode && n.parentNode.removeChild(n));
         group = [];
         groupStart = null;
         removeNodes = [];
-        return;
-      }
-      const wrapper = document.createElement('div');
-      wrapper.className = 'img-grid';
-      const cols = Math.min(4, group.length);
-      wrapper.style.setProperty('--cols', String(cols));
-      if (groupStart) {
-        root.insertBefore(wrapper, groupStart);
-      } else {
-        root.appendChild(wrapper);
-      }
-      group.forEach((img) => wrapper.appendChild(img));
-      removeNodes.forEach((n) => n.parentNode && n.parentNode.removeChild(n));
-      group = [];
-      groupStart = null;
-      removeNodes = [];
+      };
+
+      children.forEach((node) => {
+        if (group.length && isIgnorable(node)) {
+          removeNodes.push(node);
+          return;
+        }
+        const extracted = extractImageItems(node);
+        if (extracted && extracted.items.length) {
+          if (!groupStart) groupStart = node;
+          group.push(...extracted.items);
+          if (extracted.removeNode) {
+            removeNodes.push(extracted.removeNode);
+          }
+          return;
+        }
+        flush();
+      });
+      flush();
     };
 
-    children.forEach((node) => {
-      if (group.length && isIgnorable(node)) {
-        removeNodes.push(node);
-        return;
-      }
-      const extracted = extractImageItems(node);
-      if (extracted && extracted.items.length) {
-        if (!groupStart) groupStart = node;
-        group.push(...extracted.items);
-        if (extracted.removeNode) {
-          removeNodes.push(extracted.removeNode);
-        }
-        return;
-      }
-      flush();
+    const containers = [root, ...root.querySelectorAll('.think-content, .think-item-body, .think-rollout-body, .think-agent-items')];
+    containers.forEach((container) => {
+      if (!container || container.closest('.img-grid')) return;
+      if (!container.querySelector || !container.querySelector('img')) return;
+      wrapImagesInContainer(container);
     });
-    flush();
   }
 
   function updateMessage(entry, content, finalize = false) {
@@ -540,11 +551,42 @@
       thinkNodes.forEach((node) => {
         node.scrollTop = node.scrollHeight;
       });
+      enhanceBrokenImages(entry.contentNode);
       if (finalize && entry.row && !entry.row.querySelector('.message-actions')) {
         attachAssistantActions(entry);
       }
     }
     scrollToBottom();
+  }
+
+  function enhanceBrokenImages(root) {
+    if (!root) return;
+    const images = root.querySelectorAll('img');
+    images.forEach((img) => {
+      if (img.dataset.retryBound) return;
+      img.dataset.retryBound = '1';
+      img.addEventListener('error', () => {
+        if (img.dataset.failed) return;
+        img.dataset.failed = '1';
+        const wrapper = document.createElement('button');
+        wrapper.type = 'button';
+        wrapper.className = 'img-retry';
+        wrapper.textContent = '点击重试';
+        wrapper.addEventListener('click', () => {
+          wrapper.classList.add('loading');
+          const original = img.getAttribute('src') || '';
+          const cacheBust = original.includes('?') ? '&' : '?';
+          img.dataset.failed = '';
+          img.src = `${original}${cacheBust}t=${Date.now()}`;
+        });
+        img.replaceWith(wrapper);
+      });
+      img.addEventListener('load', () => {
+        if (img.dataset.failed) {
+          img.dataset.failed = '';
+        }
+      });
+    });
   }
 
   function updateThinkSummary(entry, elapsedSec) {
@@ -554,6 +596,13 @@
     const text = typeof elapsedSec === 'number' ? `思考 ${elapsedSec} 秒` : '思考中';
     summaries.forEach((node) => {
       node.textContent = text;
+      const block = node.closest('.think-block');
+      if (!block) return;
+      if (typeof elapsedSec === 'number') {
+        block.removeAttribute('data-thinking');
+      } else {
+        block.setAttribute('data-thinking', 'true');
+      }
     });
   }
 
@@ -966,8 +1015,16 @@
       toggleSettings(false);
     });
     if (promptInput) {
+      let composing = false;
+      promptInput.addEventListener('compositionstart', () => {
+        composing = true;
+      });
+      promptInput.addEventListener('compositionend', () => {
+        composing = false;
+      });
       promptInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
+          if (composing || event.isComposing) return;
           event.preventDefault();
           sendMessage();
         }
