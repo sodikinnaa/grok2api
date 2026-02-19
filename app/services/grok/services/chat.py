@@ -397,6 +397,7 @@ class StreamProcessor(proc_base.BaseProcessor):
         self.fingerprint: str = ""
         self.rollout_id: str = ""
         self.think_opened: bool = False
+        self.image_think_active: bool = False
         self.role_sent: bool = False
         self.filter_tags = get_config("app.filter_tags")
         self.tool_usage_enabled = (
@@ -543,12 +544,10 @@ class StreamProcessor(proc_base.BaseProcessor):
                 if img := resp.get("streamingImageGenerationResponse"):
                     if not self.show_think:
                         continue
-                    if is_thinking and not self.think_opened:
+                    self.image_think_active = True
+                    if not self.think_opened:
                         yield self._sse("<think>\n")
                         self.think_opened = True
-                    if (not is_thinking) and self.think_opened:
-                        yield self._sse("\n</think>\n")
-                        self.think_opened = False
                     idx = img.get("imageIndex", 0) + 1
                     progress = img.get("progress", 0)
                     yield self._sse(
@@ -557,6 +556,10 @@ class StreamProcessor(proc_base.BaseProcessor):
                     continue
 
                 if mr := resp.get("modelResponse"):
+                    if self.image_think_active and self.think_opened:
+                        yield self._sse("\n</think>\n")
+                        self.think_opened = False
+                    self.image_think_active = False
                     for url in proc_base._collect_images(mr):
                         parts = url.split("/")
                         img_id = parts[-2] if len(parts) >= 2 else "image"
@@ -599,7 +602,8 @@ class StreamProcessor(proc_base.BaseProcessor):
                     filtered = self._filter_token(token)
                     if not filtered:
                         continue
-                    if is_thinking:
+                    in_think = is_thinking or self.image_think_active
+                    if in_think:
                         if not self.show_think:
                             continue
                         if not self.think_opened:
