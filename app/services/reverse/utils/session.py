@@ -21,6 +21,10 @@ class ResettableSession:
         **session_kwargs: Any,
     ):
         self._session_kwargs = dict(session_kwargs)
+        if not self._session_kwargs.get("impersonate"):
+            browser = get_config("proxy.browser")
+            if browser:
+                self._session_kwargs["impersonate"] = browser
         config_codes = get_config("retry.reset_session_status_codes")
         if reset_on_status is None:
             reset_on_status = config_codes if config_codes is not None else [403]

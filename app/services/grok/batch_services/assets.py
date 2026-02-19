@@ -21,7 +21,11 @@ class BaseAssetsService:
 
     async def _get_session(self) -> ResettableSession:
         if self._session is None:
-            self._session = ResettableSession()
+            browser = get_config("proxy.browser")
+            if browser:
+                self._session = ResettableSession(impersonate=browser)
+            else:
+                self._session = ResettableSession()
         return self._session
 
     async def close(self):

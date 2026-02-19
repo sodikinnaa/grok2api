@@ -38,7 +38,11 @@ class DownloadService:
     async def create(self) -> ResettableSession:
         """Create or reuse a session."""
         if self._session is None:
-            self._session = ResettableSession()
+            browser = get_config("proxy.browser")
+            if browser:
+                self._session = ResettableSession(impersonate=browser)
+            else:
+                self._session = ResettableSession()
         return self._session
 
     async def close(self):

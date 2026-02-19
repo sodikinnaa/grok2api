@@ -48,6 +48,13 @@ def _get_video_semaphore() -> asyncio.Semaphore:
     return _VIDEO_SEMAPHORE
 
 
+def _new_session() -> ResettableSession:
+    browser = get_config("proxy.browser")
+    if browser:
+        return ResettableSession(impersonate=browser)
+    return ResettableSession()
+
+
 class VideoService:
     """Video generation service."""
 
@@ -69,7 +76,7 @@ class VideoService:
             prompt_value = prompt if media_type == "MEDIA_POST_TYPE_VIDEO" else ""
             media_value = media_url or ""
 
-            async with ResettableSession() as session:
+            async with _new_session() as session:
                 async with _get_video_semaphore():
                     response = await MediaPostReverse.request(
                         session,
@@ -131,7 +138,7 @@ class VideoService:
         }
 
         async def _stream():
-            session = ResettableSession()
+            session = _new_session()
             try:
                 async with _get_video_semaphore():
                     stream_response = await AppChatReverse.request(
@@ -191,7 +198,7 @@ class VideoService:
         }
 
         async def _stream():
-            session = ResettableSession()
+            session = _new_session()
             try:
                 async with _get_video_semaphore():
                     stream_response = await AppChatReverse.request(
@@ -401,7 +408,7 @@ class VideoStreamProcessor(BaseProcessor):
             logger.warning("Video upscale skipped: unable to extract video id")
             return video_url
         try:
-            async with ResettableSession() as session:
+            async with _new_session() as session:
                 response = await VideoUpscaleReverse.request(
                     session, self.token, video_id
                 )
@@ -583,7 +590,7 @@ class VideoCollectProcessor(BaseProcessor):
             logger.warning("Video upscale skipped: unable to extract video id")
             return video_url
         try:
-            async with ResettableSession() as session:
+            async with _new_session() as session:
                 response = await VideoUpscaleReverse.request(
                     session, self.token, video_id
                 )

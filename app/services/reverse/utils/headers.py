@@ -1,5 +1,6 @@
 """Shared header builders for reverse interfaces."""
 
+import re
 import uuid
 import orjson
 from urllib.parse import urlparse
@@ -34,6 +35,95 @@ def build_sso_cookie(sso_token: str) -> str:
     return cookie
 
 
+def _extract_major_version(browser: Optional[str], user_agent: Optional[str]) -> Optional[str]:
+    if browser:
+        match = re.search(r"(\d{2,3})", browser)
+        if match:
+            return match.group(1)
+    if user_agent:
+        for pattern in [r"Edg/(\d+)", r"Chrome/(\d+)", r"Chromium/(\d+)"]:
+            match = re.search(pattern, user_agent)
+            if match:
+                return match.group(1)
+    return None
+
+
+def _detect_platform(user_agent: str) -> Optional[str]:
+    ua = user_agent.lower()
+    if "windows" in ua:
+        return "Windows"
+    if "mac os x" in ua or "macintosh" in ua:
+        return "macOS"
+    if "android" in ua:
+        return "Android"
+    if "iphone" in ua or "ipad" in ua:
+        return "iOS"
+    if "linux" in ua:
+        return "Linux"
+    return None
+
+
+def _detect_arch(user_agent: str) -> Optional[str]:
+    ua = user_agent.lower()
+    if "aarch64" in ua or "arm" in ua:
+        return "arm"
+    if "x86_64" in ua or "x64" in ua or "win64" in ua or "intel" in ua:
+        return "x86"
+    return None
+
+
+def _build_client_hints(browser: Optional[str], user_agent: Optional[str]) -> Dict[str, str]:
+    browser = (browser or "").strip().lower()
+    user_agent = user_agent or ""
+    ua = user_agent.lower()
+
+    is_edge = "edge" in browser or "edg" in ua
+    is_brave = "brave" in browser
+    is_chromium = any(key in browser for key in ["chrome", "chromium", "edge", "brave"]) or (
+        "chrome" in ua or "chromium" in ua or "edg" in ua
+    )
+    is_firefox = "firefox" in ua or "firefox" in browser
+    is_safari = ("safari" in ua and "chrome" not in ua and "chromium" not in ua and "edg" not in ua) or "safari" in browser
+
+    if not is_chromium or is_firefox or is_safari:
+        return {}
+
+    version = _extract_major_version(browser, user_agent)
+    if not version:
+        return {}
+
+    if is_edge:
+        brand = "Microsoft Edge"
+    elif "chromium" in browser:
+        brand = "Chromium"
+    elif is_brave:
+        brand = "Brave"
+    else:
+        brand = "Google Chrome"
+
+    sec_ch_ua = (
+        f"\"{brand}\";v=\"{version}\", "
+        f"\"Chromium\";v=\"{version}\", "
+        "\"Not(A:Brand\";v=\"24\""
+    )
+
+    platform = _detect_platform(user_agent)
+    arch = _detect_arch(user_agent)
+    mobile = "?1" if ("mobile" in ua or platform in ("Android", "iOS")) else "?0"
+
+    hints = {
+        "Sec-Ch-Ua": sec_ch_ua,
+        "Sec-Ch-Ua-Mobile": mobile,
+    }
+    if platform:
+        hints["Sec-Ch-Ua-Platform"] = f"\"{platform}\""
+    if arch:
+        hints["Sec-Ch-Ua-Arch"] = arch
+        hints["Sec-Ch-Ua-Bitness"] = "64"
+    hints["Sec-Ch-Ua-Model"] = "" if mobile == "?0" else ""
+    return hints
+
+
 def build_ws_headers(token: Optional[str] = None, origin: Optional[str] = None, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     """
     Build headers for WebSocket requests.
@@ -46,13 +136,18 @@ def build_ws_headers(token: Optional[str] = None, origin: Optional[str] = None, 
     Returns:
         Dict[str, str]: The headers dictionary.
     """
+    user_agent = get_config("proxy.user_agent")
     headers = {
         "Origin": origin or "https://grok.com",
-        "User-Agent": get_config("proxy.user_agent"),
+        "User-Agent": user_agent,
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         "Cache-Control": "no-cache",
         "Pragma": "no-cache",
     }
+
+    client_hints = _build_client_hints(get_config("proxy.browser"), user_agent)
+    if client_hints:
+        headers.update(client_hints)
 
     if token:
         headers["Cookie"] = build_sso_cookie(token)
@@ -76,6 +171,7 @@ def build_headers(cookie_token: str, content_type: Optional[str] = None, origin:
     Returns:
         Dict[str, str]: The headers dictionary.
     """
+    user_agent = get_config("proxy.user_agent")
     headers = {
         "Accept-Encoding": "gzip, deflate, br, zstd",
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
@@ -83,15 +179,13 @@ def build_headers(cookie_token: str, content_type: Optional[str] = None, origin:
         "Origin": origin or "https://grok.com",
         "Priority": "u=1, i",
         "Referer": referer or "https://grok.com/",
-        "Sec-Ch-Ua": '"Google Chrome";v="136", "Chromium";v="136", "Not(A:Brand";v="24"',
-        "Sec-Ch-Ua-Arch": "arm",
-        "Sec-Ch-Ua-Bitness": "64",
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Model": "",
-        "Sec-Ch-Ua-Platform": '"macOS"',
         "Sec-Fetch-Mode": "cors",
-        "User-Agent": get_config("proxy.user_agent"),
+        "User-Agent": user_agent,
     }
+
+    client_hints = _build_client_hints(get_config("proxy.browser"), user_agent)
+    if client_hints:
+        headers.update(client_hints)
 
     # Cookie
     headers["Cookie"] = build_sso_cookie(cookie_token)

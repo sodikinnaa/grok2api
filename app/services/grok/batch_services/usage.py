@@ -42,7 +42,12 @@ class UsageService:
         """
         async with _get_usage_semaphore():
             try:
-                async with ResettableSession() as session:
+                browser = get_config("proxy.browser")
+                if browser:
+                    session_ctx = ResettableSession(impersonate=browser)
+                else:
+                    session_ctx = ResettableSession()
+                async with session_ctx as session:
                     response = await RateLimitsReverse.request(session, token)
                 data = response.json()
                 remaining = data.get("remainingTokens")
