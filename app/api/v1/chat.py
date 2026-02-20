@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 import base64
 import binascii
 import time
+import uuid
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -557,6 +558,7 @@ async def chat_completions(request: ChatCompletionRequest):
             n=n,
             response_format=response_format,
             stream=bool(is_stream),
+            chat_format=True,
         )
 
         if result.stream:
@@ -569,8 +571,21 @@ async def chat_completions(request: ChatCompletionRequest):
         data = [{response_field: img} for img in result.data]
         return JSONResponse(
             content={
+                "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
+                "object": "chat.completion",
                 "created": int(time.time()),
-                "data": data,
+                "model": request.model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": data[0].get(response_field, "") if data else "",
+                            "refusal": None,
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
                 "usage": {
                     "total_tokens": 0,
                     "input_tokens": 0,
@@ -628,6 +643,7 @@ async def chat_completions(request: ChatCompletionRequest):
             size=size,
             aspect_ratio=aspect_ratio,
             stream=bool(is_stream),
+            chat_format=True,
         )
 
         if result.stream:
@@ -646,8 +662,21 @@ async def chat_completions(request: ChatCompletionRequest):
         }
         return JSONResponse(
             content={
+                "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
+                "object": "chat.completion",
                 "created": int(time.time()),
-                "data": data,
+                "model": request.model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": data[0].get(response_field, "") if data else "",
+                            "refusal": None,
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
                 "usage": usage,
             }
         )

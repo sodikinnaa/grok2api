@@ -3,8 +3,10 @@ Grok image edit service.
 """
 
 import asyncio
+import os
 import random
 import re
+import time
 from dataclasses import dataclass
 from typing import AsyncGenerator, AsyncIterable, List, Union, Any
 
@@ -54,6 +56,7 @@ class ImageEditService:
         n: int,
         response_format: str,
         stream: bool,
+        chat_format: bool = False,
     ) -> ImageEditResult:
         max_token_retries = int(get_config("retry.max_retry"))
         tried_tokens: set[str] = set()
@@ -111,6 +114,7 @@ class ImageEditService:
                         current_token,
                         n=n,
                         response_format=response_format,
+                        chat_format=chat_format,
                     )
                     return ImageEditResult(
                         stream=True,
@@ -285,13 +289,16 @@ class ImageStreamProcessor(BaseProcessor):
     """HTTP image stream processor."""
 
     def __init__(
-        self, model: str, token: str = "", n: int = 1, response_format: str = "b64_json"
+        self, model: str, token: str = "", n: int = 1, response_format: str = "b64_json", chat_format: bool = False
     ):
         super().__init__(model, token)
         self.partial_index = 0
         self.n = n
         self.target_index = 0 if n == 1 else None
         self.response_format = response_format
+        self.chat_format = chat_format
+        self._id_generated = False
+        self._response_id = ""
         if response_format == "url":
             self.response_field = "url"
         elif response_format == "base64":
@@ -332,15 +339,39 @@ class ImageStreamProcessor(BaseProcessor):
 
                     out_index = 0 if self.n == 1 else image_index
 
-                    yield self._sse(
-                        "image_generation.partial_image",
-                        {
-                            "type": "image_generation.partial_image",
-                            self.response_field: "",
-                            "index": out_index,
-                            "progress": progress,
-                        },
-                    )
+                    if self.chat_format:
+                        # OpenAI ChatCompletion chunk format for partial
+                        if not self._id_generated:
+                            self._response_id = f"chatcmpl-{int(time.time() * 1000)}{os.urandom(4).hex()}"
+                            self._id_generated = True
+                        yield self._sse(
+                            "chat.completion.chunk",
+                            {
+                                "id": self._response_id,
+                                "object": "chat.completion.chunk",
+                                "created": int(time.time()),
+                                "model": self.model,
+                                "choices": [
+                                    {
+                                        "index": out_index,
+                                        "delta": {
+                                            "role": "assistant",
+                                            "content": "",
+                                        },
+                                    }
+                                ],
+                            },
+                        )
+                    else:
+                        yield self._sse(
+                            "image_generation.partial_image",
+                            {
+                                "type": "image_generation.partial_image",
+                                self.response_field: "",
+                                "index": out_index,
+                                "progress": progress,
+                            },
+                        )
                     continue
 
                 # modelResponse
@@ -372,7 +403,7 @@ class ImageStreamProcessor(BaseProcessor):
                                     final_images.append(processed)
                     continue
 
-            for index, b64 in enumerate(final_images):
+            for index, img_data in enumerate(final_images):
                 if self.n == 1:
                     if index != self.target_index:
                         continue
@@ -380,23 +411,67 @@ class ImageStreamProcessor(BaseProcessor):
                 else:
                     out_index = index
 
-                yield self._sse(
-                    "image_generation.completed",
-                    {
-                        "type": "image_generation.completed",
-                        self.response_field: b64,
-                        "index": out_index,
-                        "usage": {
-                            "total_tokens": 0,
-                            "input_tokens": 0,
-                            "output_tokens": 0,
-                            "input_tokens_details": {
-                                "text_tokens": 0,
-                                "image_tokens": 0,
+                # Wrap in markdown format for chat
+                output = img_data
+                if self.chat_format and output:
+                    if self.response_format == "url":
+                        output = f"![image]({img_data})"
+                    else:
+                        output = f"![image](data:image/png;base64,{img_data})"
+
+                if not self._id_generated:
+                    self._response_id = f"chatcmpl-{int(time.time() * 1000)}{os.urandom(4).hex()}"
+                    self._id_generated = True
+
+                if self.chat_format:
+                    # OpenAI ChatCompletion chunk format
+                    yield self._sse(
+                        "chat.completion.chunk",
+                        {
+                            "id": self._response_id,
+                            "object": "chat.completion.chunk",
+                            "created": int(time.time()),
+                            "model": self.model,
+                            "choices": [
+                                {
+                                    "index": out_index,
+                                    "delta": {
+                                        "role": "assistant",
+                                        "content": output,
+                                    },
+                                    "finish_reason": "stop",
+                                }
+                            ],
+                            "usage": {
+                                "total_tokens": 0,
+                                "input_tokens": 0,
+                                "output_tokens": 0,
+                                "input_tokens_details": {
+                                    "text_tokens": 0,
+                                    "image_tokens": 0,
+                                },
                             },
                         },
-                    },
-                )
+                    )
+                else:
+                    # Original image_generation format
+                    yield self._sse(
+                        "image_generation.completed",
+                        {
+                            "type": "image_generation.completed",
+                            self.response_field: img_data,
+                            "index": out_index,
+                            "usage": {
+                                "total_tokens": 0,
+                                "input_tokens": 0,
+                                "output_tokens": 0,
+                                "input_tokens_details": {
+                                    "text_tokens": 0,
+                                    "image_tokens": 0,
+                                },
+                            },
+                        },
+                    )
         except asyncio.CancelledError:
             logger.debug("Image stream cancelled by client")
         except StreamIdleTimeoutError as e:
