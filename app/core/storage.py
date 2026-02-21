@@ -15,7 +15,7 @@ import asyncio
 import hashlib
 import time
 import tomllib
-from typing import Any, Dict, Optional
+from typing import Any, ClassVar, Dict, Optional
 from pathlib import Path
 from enum import Enum
 
@@ -552,7 +552,7 @@ class SQLStorage(BaseStorage):
     - 内置连接池 (QueuePool)
     """
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, connect_args: dict | None = None):
         try:
             from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
         except ImportError:
@@ -570,6 +570,7 @@ class SQLStorage(BaseStorage):
             max_overflow=10,
             pool_recycle=3600,
             pool_pre_ping=True,
+            **({"connect_args": connect_args} if connect_args else {}),
         )
         self.async_session = async_sessionmaker(self.engine, expire_on_commit=False)
         self._initialized = False
@@ -1272,23 +1273,174 @@ class StorageFactory:
 
     _instance: Optional[BaseStorage] = None
 
-    @staticmethod
-    def _normalize_sql_url(storage_type: str, url: str) -> str:
+    # SSL-related query parameters that async drivers (asyncpg, aiomysql)
+    # cannot accept via the URL and must be passed as connect_args instead.
+    _SQL_SSL_PARAM_KEYS = ("sslmode", "ssl-mode", "ssl")
+
+    # Canonical postgres ssl modes (asyncpg accepts libpq-style mode strings).
+    _PG_SSL_MODE_ALIASES: ClassVar[dict[str, str]] = {
+        "disable": "disable",
+        "disabled": "disable",
+        "false": "disable",
+        "0": "disable",
+        "no": "disable",
+        "off": "disable",
+        "prefer": "prefer",
+        "preferred": "prefer",
+        "allow": "allow",
+        "require": "require",
+        "required": "require",
+        "true": "require",
+        "1": "require",
+        "yes": "require",
+        "on": "require",
+        "verify-ca": "verify-ca",
+        "verify_ca": "verify-ca",
+        "verify-full": "verify-full",
+        "verify_full": "verify-full",
+        "verify-identity": "verify-full",
+        "verify_identity": "verify-full",
+    }
+
+    # Canonical mysql ssl modes (aiomysql accepts SSLContext, not mode strings).
+    _MY_SSL_MODE_ALIASES: ClassVar[dict[str, str]] = {
+        "disable": "disabled",
+        "disabled": "disabled",
+        "false": "disabled",
+        "0": "disabled",
+        "no": "disabled",
+        "off": "disabled",
+        "prefer": "preferred",
+        "preferred": "preferred",
+        "allow": "preferred",
+        "require": "required",
+        "required": "required",
+        "true": "required",
+        "1": "required",
+        "yes": "required",
+        "on": "required",
+        "verify-ca": "verify_ca",
+        "verify_ca": "verify_ca",
+        "verify-full": "verify_identity",
+        "verify_full": "verify_identity",
+        "verify-identity": "verify_identity",
+        "verify_identity": "verify_identity",
+    }
+
+    @classmethod
+    def _normalize_ssl_mode(cls, storage_type: str, mode: str) -> str:
+        """Normalize SSL mode aliases for the target storage backend."""
+        if not mode:
+            raise ValueError("SSL mode cannot be empty")
+
+        normalized = mode.strip().lower().replace(" ", "")
+        if storage_type == "pgsql":
+            canonical = cls._PG_SSL_MODE_ALIASES.get(normalized)
+        elif storage_type == "mysql":
+            canonical = cls._MY_SSL_MODE_ALIASES.get(normalized)
+        else:
+            canonical = None
+
+        if not canonical:
+            raise ValueError(
+                f"Unsupported SSL mode '{mode}' for storage type '{storage_type}'"
+            )
+        return canonical
+
+    @classmethod
+    def _build_mysql_ssl_context(cls, mode: str):
+        """Build SSLContext for aiomysql according to normalized mysql mode.
+
+        Note: aiomysql enforces SSL whenever an SSLContext is provided — there
+        is no "try SSL, fall back to plaintext" behaviour.  As a result the
+        ``preferred`` mode is treated identically to ``required`` (encrypted,
+        no cert verification).  Connections to MySQL servers that do not
+        support SSL will fail rather than degrade gracefully.
+        """
+        import ssl as _ssl
+
+        if mode == "disabled":
+            return None
+
+        ctx = _ssl.create_default_context()
+        if mode in ("preferred", "required"):
+            ctx.check_hostname = False
+            ctx.verify_mode = _ssl.CERT_NONE
+        elif mode == "verify_ca":
+            # verify CA, but do not enforce hostname match.
+            ctx.check_hostname = False
+        # verify_identity keeps defaults: verify cert + hostname.
+        return ctx
+
+    @classmethod
+    def _build_sql_connect_args(
+        cls, storage_type: str, raw_ssl_mode: Optional[str]
+    ) -> Optional[dict]:
+        """Build SQLAlchemy connect_args for SQL SSL modes."""
+        if not raw_ssl_mode:
+            return None
+
+        mode = cls._normalize_ssl_mode(storage_type, raw_ssl_mode)
+        if storage_type == "pgsql":
+            # asyncpg accepts libpq-style ssl mode strings via ssl=...
+            return {"ssl": mode}
+        if storage_type == "mysql":
+            ctx = cls._build_mysql_ssl_context(mode)
+            if ctx is None:
+                return None
+            return {"ssl": ctx}
+        return None
+
+    @classmethod
+    def _normalize_sql_url(cls, storage_type: str, url: str) -> str:
+        """Rewrite scheme prefix to the SQLAlchemy async dialect form."""
         if not url or "://" not in url:
             return url
         if storage_type == "mysql":
             if url.startswith("mysql://"):
-                return f"mysql+aiomysql://{url[len('mysql://') :]}"
-            if url.startswith("mariadb://"):
-                return f"mariadb+aiomysql://{url[len('mariadb://') :]}"
-        if storage_type == "pgsql":
+                url = f"mysql+aiomysql://{url[len('mysql://') :]}"
+            elif url.startswith("mariadb://"):
+                # Use mysql+aiomysql for both MySQL and MariaDB endpoints.
+                # The mariadb dialect enforces strict MariaDB server detection.
+                url = f"mysql+aiomysql://{url[len('mariadb://') :]}"
+            elif url.startswith("mariadb+aiomysql://"):
+                url = f"mysql+aiomysql://{url[len('mariadb+aiomysql://') :]}"
+        elif storage_type == "pgsql":
             if url.startswith("postgres://"):
-                return f"postgresql+asyncpg://{url[len('postgres://') :]}"
-            if url.startswith("postgresql://"):
-                return f"postgresql+asyncpg://{url[len('postgresql://') :]}"
-            if url.startswith("pgsql://"):
-                return f"postgresql+asyncpg://{url[len('pgsql://') :]}"
+                url = f"postgresql+asyncpg://{url[len('postgres://') :]}"
+            elif url.startswith("postgresql://"):
+                url = f"postgresql+asyncpg://{url[len('postgresql://') :]}"
+            elif url.startswith("pgsql://"):
+                url = f"postgresql+asyncpg://{url[len('pgsql://') :]}"
         return url
+
+    @classmethod
+    def _prepare_sql_url_and_connect_args(
+        cls, storage_type: str, url: str
+    ) -> tuple[str, Optional[dict]]:
+        """Normalize SQL URL and build connect_args from SSL query params."""
+        from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+
+        normalized_url = cls._normalize_sql_url(storage_type, url)
+        if "://" not in normalized_url:
+            return normalized_url, None
+
+        parsed = urlparse(normalized_url)
+        ssl_mode: Optional[str] = None
+        filtered_query_items = []
+        ssl_param_keys = {k.lower() for k in cls._SQL_SSL_PARAM_KEYS}
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True):
+            if key.lower() in ssl_param_keys:
+                if ssl_mode is None and value:
+                    ssl_mode = value
+                continue
+            filtered_query_items.append((key, value))
+
+        cleaned_url = urlunparse(
+            parsed._replace(query=urlencode(filtered_query_items, doseq=True))
+        )
+        connect_args = cls._build_sql_connect_args(storage_type, ssl_mode)
+        return cleaned_url, connect_args
 
     @classmethod
     def get_storage(cls) -> BaseStorage:
@@ -1309,8 +1461,12 @@ class StorageFactory:
         elif storage_type in ("mysql", "pgsql"):
             if not storage_url:
                 raise ValueError("SQL 存储需要设置 SERVER_STORAGE_URL")
-            storage_url = cls._normalize_sql_url(storage_type, storage_url)
-            cls._instance = SQLStorage(storage_url)
+            # Drivers reject SSL query params in URL. Normalize URL and pass
+            # backend-specific SSL handling through connect_args.
+            storage_url, connect_args = cls._prepare_sql_url_and_connect_args(
+                storage_type, storage_url
+            )
+            cls._instance = SQLStorage(storage_url, connect_args=connect_args)
 
         else:
             cls._instance = LocalStorage()
