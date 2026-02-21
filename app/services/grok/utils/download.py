@@ -114,17 +114,6 @@ class DownloadService:
   <source id="mp4" src="{safe_video_url}" type="video/mp4">
 </video>'''
 
-    @staticmethod
-    def _is_url(value: str) -> bool:
-        """Check if the value is a URL."""
-        try:
-            parsed = urlparse(value)
-            return bool(
-                parsed.scheme and parsed.netloc and parsed.scheme in ["http", "https"]
-            )
-        except Exception:
-            return False
-
     async def parse_b64(self, file_path: str, token: str, media_type: str = "image") -> str:
         """Download and return data URI."""
         try:
@@ -132,9 +121,6 @@ class DownloadService:
                 raise AppException("Invalid file path", code="invalid_file_path")
             if file_path.startswith("data:"):
                 raise AppException("Invalid file path", code="invalid_file_path")
-            if not self._is_url(file_path):
-                raise AppException("Invalid file path", code="invalid_file_path")
-
             file_path = self._normalize_path(file_path)
             lock_name = f"dl_b64_{hashlib.sha1(file_path.encode()).hexdigest()[:16]}"
             lock_timeout = max(1, int(get_config("asset.download_timeout")))
@@ -165,19 +151,32 @@ class DownloadService:
             raise
 
     def _normalize_path(self, file_path: str) -> str:
-        """Normalize file path for download."""
+        """Normalize URL or path to assets path for download."""
         if not isinstance(file_path, str) or not file_path.strip():
             raise AppException("Invalid file path", code="invalid_file_path")
-        parsed = urlparse(file_path)
-        if not (parsed.scheme and parsed.netloc and parsed.scheme in ["http", "https"]):
+
+        value = file_path.strip()
+        if value.startswith("data:"):
             raise AppException("Invalid file path", code="invalid_file_path")
-        path = parsed.path or ""
-        if parsed.query:
-            path = f"{path}?{parsed.query}"
-        file_path = path
-        if not file_path.startswith("/"):
-            file_path = f"/{file_path}"
-        return file_path
+
+        parsed = urlparse(value)
+        if parsed.scheme or parsed.netloc:
+            if not (
+                parsed.scheme and parsed.netloc and parsed.scheme in ["http", "https"]
+            ):
+                raise AppException("Invalid file path", code="invalid_file_path")
+            path = parsed.path or ""
+            if parsed.query:
+                path = f"{path}?{parsed.query}"
+        else:
+            path = value
+
+        if not path:
+            raise AppException("Invalid file path", code="invalid_file_path")
+        if not path.startswith("/"):
+            path = f"/{path}"
+
+        return path
 
     async def download_file(self, file_path: str, token: str, media_type: str = "image") -> Tuple[Optional[Path], str]:
         """Download asset to local cache.
