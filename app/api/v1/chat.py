@@ -28,6 +28,9 @@ class MessageItem(BaseModel):
 
     role: str
     content: Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]]
+    tool_call_id: Optional[str] = None
+    name: Optional[str] = None
+    tool_calls: Optional[List[Dict[str, Any]]] = None
 
 
 class VideoConfig(BaseModel):
@@ -61,7 +64,7 @@ class ChatCompletionRequest(BaseModel):
     image_config: Optional[ImageConfig] = Field(None, description="图片生成参数")
 
 
-VALID_ROLES = {"developer", "system", "user", "assistant"}
+VALID_ROLES = {"developer", "system", "user", "assistant", "tool"}
 USER_CONTENT_TYPES = {"text", "image_url", "input_audio", "file"}
 ALLOWED_IMAGE_SIZES = {
     "1280x720",
@@ -205,9 +208,9 @@ def validate_request(request: ChatCompletionRequest):
             )
         content = msg.content
 
-        # 兼容部分客户端会发送 assistant 空内容（例如工具调用中间态）
+        # 兼容部分客户端会发送 assistant/tool 空内容（例如工具调用中间态）
         if content is None:
-            if msg.role == "assistant":
+            if msg.role in {"assistant", "tool"}:
                 continue
             raise ValidationException(
                 message="Message content cannot be null",
