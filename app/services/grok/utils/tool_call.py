@@ -91,6 +91,122 @@ _TOOL_CALL_RE = re.compile(
 )
 
 
+def _strip_code_fences(text: str) -> str:
+    if not text:
+        return text
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    return cleaned.strip()
+
+
+def _extract_json_object(text: str) -> str:
+    if not text:
+        return text
+    start = text.find("{")
+    if start == -1:
+        return text
+    end = text.rfind("}")
+    if end == -1:
+        return text[start:]
+    if end < start:
+        return text
+    return text[start : end + 1]
+
+
+def _remove_trailing_commas(text: str) -> str:
+    if not text:
+        return text
+    return re.sub(r",\s*([}\]])", r"\1", text)
+
+
+def _balance_braces(text: str) -> str:
+    if not text:
+        return text
+    open_count = 0
+    close_count = 0
+    in_string = False
+    escape = False
+    for ch in text:
+        if escape:
+            escape = False
+            continue
+        if ch == "\\" and in_string:
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            open_count += 1
+        elif ch == "}":
+            close_count += 1
+    if open_count > close_count:
+        text = text + ("}" * (open_count - close_count))
+    return text
+
+
+def _repair_json(text: str) -> Optional[Any]:
+    if not text:
+        return None
+    cleaned = _strip_code_fences(text)
+    cleaned = _extract_json_object(cleaned)
+    cleaned = cleaned.replace("\r\n", "\n").replace("\r", "\n")
+    cleaned = cleaned.replace("\n", " ")
+    cleaned = _remove_trailing_commas(cleaned)
+    cleaned = _balance_braces(cleaned)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        return None
+
+
+def parse_tool_call_block(
+    raw_json: str,
+    tools: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[Dict[str, Any]]:
+    if not raw_json:
+        return None
+    parsed = None
+    try:
+        parsed = json.loads(raw_json)
+    except json.JSONDecodeError:
+        parsed = _repair_json(raw_json)
+    if not isinstance(parsed, dict):
+        return None
+
+    name = parsed.get("name")
+    arguments = parsed.get("arguments", {})
+    if not name:
+        return None
+
+    valid_names = set()
+    if tools:
+        for tool in tools:
+            func = tool.get("function", {})
+            tool_name = func.get("name")
+            if tool_name:
+                valid_names.add(tool_name)
+    if valid_names and name not in valid_names:
+        return None
+
+    if isinstance(arguments, dict):
+        arguments_str = json.dumps(arguments, ensure_ascii=False)
+    elif isinstance(arguments, str):
+        arguments_str = arguments
+    else:
+        arguments_str = json.dumps(arguments, ensure_ascii=False)
+
+    return {
+        "id": f"call_{uuid.uuid4().hex[:24]}",
+        "type": "function",
+        "function": {"name": name, "arguments": arguments_str},
+    }
+
+
 def parse_tool_calls(
     content: str,
     tools: Optional[List[Dict[str, Any]]] = None,
@@ -116,52 +232,12 @@ def parse_tool_calls(
     if not matches:
         return content, None
 
-    # Build set of valid tool names for validation
-    valid_names = set()
-    if tools:
-        for tool in tools:
-            func = tool.get("function", {})
-            name = func.get("name")
-            if name:
-                valid_names.add(name)
-
     tool_calls = []
     for match in matches:
         raw_json = match.group(1).strip()
-        try:
-            parsed = json.loads(raw_json)
-        except json.JSONDecodeError:
-            continue
-
-        if not isinstance(parsed, dict):
-            continue
-
-        name = parsed.get("name")
-        arguments = parsed.get("arguments", {})
-
-        if not name:
-            continue
-
-        # Validate against known tools if provided
-        if valid_names and name not in valid_names:
-            continue
-
-        # Ensure arguments is a JSON string (OpenAI format)
-        if isinstance(arguments, dict):
-            arguments_str = json.dumps(arguments, ensure_ascii=False)
-        elif isinstance(arguments, str):
-            arguments_str = arguments
-        else:
-            arguments_str = json.dumps(arguments, ensure_ascii=False)
-
-        tool_calls.append({
-            "id": f"call_{uuid.uuid4().hex[:24]}",
-            "type": "function",
-            "function": {
-                "name": name,
-                "arguments": arguments_str,
-            },
-        })
+        tool_call = parse_tool_call_block(raw_json, tools)
+        if tool_call:
+            tool_calls.append(tool_call)
 
     if not tool_calls:
         return content, None
@@ -271,4 +347,5 @@ __all__ = [
     "parse_tool_calls",
     "build_tool_overrides",
     "format_tool_history",
+    "parse_tool_call_block",
 ]
