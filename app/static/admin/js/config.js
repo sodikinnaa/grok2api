@@ -100,6 +100,14 @@ const LOCALE_MAP = {
   },
 
 
+  "superimage": {
+    "label": "SuperImage 配置",
+    "n": { title: "生成数量", desc: "仅用于 grok-superimage-1.0 的服务端统一生成数量（1-10）。" },
+    "size": { title: "图片尺寸", desc: "仅用于 grok-superimage-1.0 的服务端统一尺寸。" },
+    "response_format": { title: "响应格式", desc: "仅用于 grok-superimage-1.0 的服务端统一返回格式。" }
+  },
+
+
   "asset": {
     "label": "资产配置",
     "upload_concurrent": { title: "上传并发", desc: "上传接口的最大并发数。推荐 30。" },
@@ -410,6 +418,22 @@ function buildFieldCard(section, key, val) {
     built = buildSelectInput(section, key, val, [
       { val: 'html', text: 'HTML' },
       { val: 'url', text: 'URL' }
+    ]);
+  }
+  else if (section === 'superimage' && key === 'size') {
+    built = buildSelectInput(section, key, val, [
+      { val: '1024x1024', text: '1024x1024 (1:1)' },
+      { val: '1280x720', text: '1280x720 (16:9)' },
+      { val: '720x1280', text: '720x1280 (9:16)' },
+      { val: '1792x1024', text: '1792x1024 (3:2)' },
+      { val: '1024x1792', text: '1024x1792 (2:3)' }
+    ]);
+  }
+  else if (section === 'superimage' && key === 'response_format') {
+    built = buildSelectInput(section, key, val, [
+      { val: 'url', text: 'URL' },
+      { val: 'b64_json', text: 'B64 JSON' },
+      { val: 'base64', text: 'Base64' }
     ]);
   }
   else if (Array.isArray(val) || typeof val === 'object') {

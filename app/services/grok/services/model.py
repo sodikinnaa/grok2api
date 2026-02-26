@@ -175,6 +175,18 @@ class ModelService:
             is_video=False,
         ),
         ModelInfo(
+            model_id="grok-superimage-1.0",
+            grok_model="grok-3",
+            model_mode="MODEL_MODE_FAST",
+            tier=Tier.BASIC,
+            cost=Cost.HIGH,
+            display_name="Grok SuperImage",
+            description="Imagine waterfall image generation model for chat completions",
+            is_image=True,
+            is_image_edit=False,
+            is_video=False,
+        ),
+        ModelInfo(
             model_id="grok-imagine-1.0",
             grok_model="grok-3",
             model_mode="MODEL_MODE_FAST",

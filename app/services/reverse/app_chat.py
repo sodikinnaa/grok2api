@@ -4,6 +4,7 @@ Reverse interface: app chat conversations.
 
 import orjson
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 from curl_cffi.requests import AsyncSession
 
 from app.core.logger import logger
@@ -102,7 +103,20 @@ class AppChatReverse:
         try:
             # Get proxies
             base_proxy = get_config("proxy.base_proxy_url")
-            proxies = {"http": base_proxy, "https": base_proxy} if base_proxy else None
+            proxy = None
+            proxies = None
+            if base_proxy:
+                scheme = urlparse(base_proxy).scheme.lower()
+                if scheme.startswith("socks"):
+                    # curl_cffi 对 SOCKS 代理优先使用 proxy 参数，避免被按 HTTP CONNECT 处理
+                    proxy = base_proxy
+                else:
+                    proxies = {"http": base_proxy, "https": base_proxy}
+                logger.info(
+                    f"AppChatReverse proxy enabled: scheme={scheme}, target={base_proxy}"
+                )
+            else:
+                logger.warning("AppChatReverse proxy is empty, request will use direct network")
 
             # Build headers
             headers = build_headers(
@@ -123,11 +137,12 @@ class AppChatReverse:
             )
 
             # Curl Config
-            timeout = max(
-                float(get_config("chat.timeout") or 0),
-                float(get_config("video.timeout") or 0),
-                float(get_config("image.timeout") or 0),
-            )
+            timeout = float(get_config("chat.timeout") or 0)
+            if timeout <= 0:
+                timeout = max(
+                    float(get_config("video.timeout") or 0),
+                    float(get_config("image.timeout") or 0),
+                )
             browser = get_config("proxy.browser")
 
             async def _do_request():
@@ -137,6 +152,7 @@ class AppChatReverse:
                     data=orjson.dumps(payload),
                     timeout=timeout,
                     stream=True,
+                    proxy=proxy,
                     proxies=proxies,
                     impersonate=browser,
                 )
