@@ -118,8 +118,34 @@ class MessageExtractor:
             if isinstance(content, str):
                 if content.strip():
                     parts.append(content)
+            elif isinstance(content, dict):
+                content = [content]
+                for item in content:
+                    if not isinstance(item, dict):
+                        continue
+                    item_type = item.get("type", "")
+                    if item_type == "text":
+                        if text := item.get("text", "").strip():
+                            parts.append(text)
+                    elif item_type == "image_url":
+                        image_data = item.get("image_url", {})
+                        url = image_data.get("url", "")
+                        if url:
+                            image_attachments.append(url)
+                    elif item_type == "input_audio":
+                        audio_data = item.get("input_audio", {})
+                        data = audio_data.get("data", "")
+                        if data:
+                            file_attachments.append(data)
+                    elif item_type == "file":
+                        file_data = item.get("file", {})
+                        raw = file_data.get("file_data", "")
+                        if raw:
+                            file_attachments.append(raw)
             elif isinstance(content, list):
                 for item in content:
+                    if not isinstance(item, dict):
+                        continue
                     item_type = item.get("type", "")
 
                     if item_type == "text":
@@ -144,8 +170,39 @@ class MessageExtractor:
                         if raw:
                             file_attachments.append(raw)
 
+            # 保留工具调用轨迹，避免部分客户端在多轮工具会话中丢失上下文顺序
+            tool_calls = msg.get("tool_calls")
+            if role == "assistant" and not parts and isinstance(tool_calls, list):
+                for call in tool_calls:
+                    if not isinstance(call, dict):
+                        continue
+                    fn = call.get("function", {})
+                    if not isinstance(fn, dict):
+                        fn = {}
+                    name = fn.get("name") or call.get("name") or "tool"
+                    arguments = fn.get("arguments", "")
+                    if isinstance(arguments, (dict, list)):
+                        try:
+                            arguments = orjson.dumps(arguments).decode()
+                        except Exception:
+                            arguments = str(arguments)
+                    if not isinstance(arguments, str):
+                        arguments = str(arguments)
+                    arguments = arguments.strip()
+                    parts.append(
+                        f"[tool_call] {name} {arguments}".strip()
+                    )
+
             if parts:
-                extracted.append({"role": role, "text": "\n".join(parts)})
+                role_label = role
+                if role == "tool":
+                    name = msg.get("name")
+                    call_id = msg.get("tool_call_id")
+                    if isinstance(name, str) and name.strip():
+                        role_label = f"tool[{name.strip()}]"
+                    if isinstance(call_id, str) and call_id.strip():
+                        role_label = f"{role_label}#{call_id.strip()}"
+                extracted.append({"role": role_label, "text": "\n".join(parts)})
 
         # 找到最后一条 user 消息
         last_user_index = next(
@@ -783,20 +840,38 @@ class CollectProcessor(proc_base.BaseProcessor):
 
         except asyncio.CancelledError:
             logger.debug("Collect cancelled by client", extra={"model": self.model})
+            raise
         except StreamIdleTimeoutError as e:
             logger.warning(f"Collect idle timeout: {e}", extra={"model": self.model})
+            raise UpstreamException(
+                message=f"Collect stream idle timeout after {e.idle_seconds}s",
+                details={
+                    "error": str(e),
+                    "type": "stream_idle_timeout",
+                    "idle_seconds": e.idle_seconds,
+                    "status": 504,
+                },
+            )
         except RequestsError as e:
             if proc_base._is_http2_error(e):
                 logger.warning(
                     f"HTTP/2 stream error in collect: {e}", extra={"model": self.model}
                 )
-            else:
-                logger.error(f"Collect request error: {e}", extra={"model": self.model})
+                raise UpstreamException(
+                    message="Upstream connection closed unexpectedly",
+                    details={"error": str(e), "type": "http2_stream_error", "status": 502},
+                )
+            logger.error(f"Collect request error: {e}", extra={"model": self.model})
+            raise UpstreamException(
+                message=f"Upstream request failed: {e}",
+                details={"error": str(e), "status": 502},
+            )
         except Exception as e:
             logger.error(
                 f"Collect processing error: {e}",
                 extra={"model": self.model, "error_type": type(e).__name__},
             )
+            raise
         finally:
             await self.close()
 
