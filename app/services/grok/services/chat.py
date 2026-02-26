@@ -29,6 +29,7 @@ from app.services.grok.utils.stream import wrap_stream_with_usage
 from app.services.grok.utils.tool_call import (
     build_tool_prompt,
     parse_tool_calls,
+    parse_tool_call_block,
     build_tool_overrides,
     format_tool_history,
 )
@@ -515,9 +516,11 @@ class StreamProcessor(proc_base.BaseProcessor):
         self.show_think = bool(show_think)
         self.tools = tools
         self.tool_choice = tool_choice
-        # When tools are provided and tool_choice != "none", buffer for tool call detection
-        self._should_buffer = bool(tools) and tool_choice != "none"
-        self._buffer_parts: list[str] = []
+        self._tool_stream_enabled = bool(tools) and tool_choice != "none"
+        self._tool_state = "text"
+        self._tool_buffer = ""
+        self._tool_partial = ""
+        self._tool_calls_seen = False
 
     def _filter_tool_card(self, token: str) -> str:
         if not token or not self.tool_usage_enabled:
@@ -591,6 +594,83 @@ class StreamProcessor(proc_base.BaseProcessor):
                 return ""
 
         return token
+
+    def _suffix_prefix(self, text: str, tag: str) -> int:
+        if not text or not tag:
+            return 0
+        max_keep = min(len(text), len(tag) - 1)
+        for keep in range(max_keep, 0, -1):
+            if text.endswith(tag[:keep]):
+                return keep
+        return 0
+
+    def _handle_tool_stream(self, chunk: str) -> list[tuple[str, Any]]:
+        events: list[tuple[str, Any]] = []
+        if not chunk:
+            return events
+
+        start_tag = "<tool_call>"
+        end_tag = "</tool_call>"
+        data = f"{self._tool_partial}{chunk}"
+        self._tool_partial = ""
+
+        while data:
+            if self._tool_state == "text":
+                start_idx = data.find(start_tag)
+                if start_idx == -1:
+                    keep = self._suffix_prefix(data, start_tag)
+                    emit = data[:-keep] if keep else data
+                    if emit:
+                        events.append(("text", emit))
+                    self._tool_partial = data[-keep:] if keep else ""
+                    break
+
+                before = data[:start_idx]
+                if before:
+                    events.append(("text", before))
+                data = data[start_idx + len(start_tag) :]
+                self._tool_state = "tool"
+                continue
+
+            end_idx = data.find(end_tag)
+            if end_idx == -1:
+                keep = self._suffix_prefix(data, end_tag)
+                append = data[:-keep] if keep else data
+                if append:
+                    self._tool_buffer += append
+                self._tool_partial = data[-keep:] if keep else ""
+                break
+
+            self._tool_buffer += data[:end_idx]
+            data = data[end_idx + len(end_tag) :]
+            tool_call = parse_tool_call_block(self._tool_buffer, self.tools)
+            if tool_call:
+                events.append(("tool", tool_call))
+                self._tool_calls_seen = True
+            self._tool_buffer = ""
+            self._tool_state = "text"
+
+        return events
+
+    def _flush_tool_stream(self) -> list[tuple[str, Any]]:
+        events: list[tuple[str, Any]] = []
+        if self._tool_state == "text":
+            if self._tool_partial:
+                events.append(("text", self._tool_partial))
+                self._tool_partial = ""
+            return events
+
+        raw = f"{self._tool_buffer}{self._tool_partial}"
+        tool_call = parse_tool_call_block(raw, self.tools)
+        if tool_call:
+            events.append(("tool", tool_call))
+            self._tool_calls_seen = True
+        elif raw:
+            events.append(("text", f"<tool_call>{raw}"))
+        self._tool_buffer = ""
+        self._tool_partial = ""
+        self._tool_state = "text"
+        return events
 
     def _sse(self, content: str = "", role: str = None, finish: str = None, tool_calls: list = None) -> str:
         """Build SSE response."""
@@ -727,30 +807,31 @@ class StreamProcessor(proc_base.BaseProcessor):
                             yield self._sse("\n</think>\n")
                             self.think_opened = False
 
-                    # Buffer for tool call detection or yield directly
-                    if self._should_buffer and not in_think:
-                        self._buffer_parts.append(filtered)
-                    else:
+                    if in_think:
                         yield self._sse(filtered)
+                        continue
+
+                    if self._tool_stream_enabled:
+                        for kind, payload in self._handle_tool_stream(filtered):
+                            if kind == "text":
+                                yield self._sse(payload)
+                            elif kind == "tool":
+                                yield self._sse(tool_calls=[payload])
+                        continue
+
+                    yield self._sse(filtered)
 
             if self.think_opened:
                 yield self._sse("</think>\n")
 
-            # If buffering for tool calls, parse and emit now
-            if self._should_buffer and self._buffer_parts:
-                full_content = "".join(self._buffer_parts)
-                text_content, tool_calls_list = parse_tool_calls(full_content, self.tools)
-
-                if tool_calls_list:
-                    # Emit any text content first
-                    if text_content:
-                        yield self._sse(text_content)
-                    # Emit tool calls in a single chunk
-                    yield self._sse(tool_calls=tool_calls_list, finish="tool_calls")
-                else:
-                    # No tool calls found, emit buffered text normally
-                    yield self._sse(full_content)
-                    yield self._sse(finish="stop")
+            if self._tool_stream_enabled:
+                for kind, payload in self._flush_tool_stream():
+                    if kind == "text":
+                        yield self._sse(payload)
+                    elif kind == "tool":
+                        yield self._sse(tool_calls=[payload])
+                finish_reason = "tool_calls" if self._tool_calls_seen else "stop"
+                yield self._sse(finish=finish_reason)
             else:
                 yield self._sse(finish="stop")
 
