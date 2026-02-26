@@ -236,6 +236,10 @@ class MessageExtractor:
 
         combined = "\n\n".join(texts)
 
+        # If there are attachments but no text, inject a fallback prompt.
+        if (not combined.strip()) and (file_attachments or image_attachments):
+            combined = "Refer to the following content:"
+
         # Prepend tool system prompt if tools are provided
         if tools:
             tool_prompt = build_tool_prompt(tools, tool_choice, parallel_tool_calls)
@@ -268,30 +272,35 @@ class GrokChatService:
         )
 
         browser = get_config("proxy.browser")
+        semaphore = _get_chat_semaphore()
+        await semaphore.acquire()
+        session = ResettableSession(impersonate=browser)
+        try:
+            stream_response = await AppChatReverse.request(
+                session,
+                token,
+                message=message,
+                model=model,
+                mode=mode,
+                file_attachments=file_attachments,
+                tool_overrides=tool_overrides,
+                model_config_override=model_config_override,
+            )
+            logger.info(f"Chat connected: model={model}, stream={stream}")
+        except Exception:
+            try:
+                await session.close()
+            except Exception:
+                pass
+            semaphore.release()
+            raise
 
         async def _stream():
-            session = ResettableSession(impersonate=browser)
             try:
-                async with _get_chat_semaphore():
-                    stream_response = await AppChatReverse.request(
-                        session,
-                        token,
-                        message=message,
-                        model=model,
-                        mode=mode,
-                        file_attachments=file_attachments,
-                        tool_overrides=tool_overrides,
-                        model_config_override=model_config_override,
-                    )
-                    logger.info(f"Chat connected: model={model}, stream={stream}")
-                    async for line in stream_response:
-                        yield line
-            except Exception:
-                try:
-                    await session.close()
-                except Exception:
-                    pass
-                raise
+                async for line in stream_response:
+                    yield line
+            finally:
+                semaphore.release()
 
         return _stream()
 
