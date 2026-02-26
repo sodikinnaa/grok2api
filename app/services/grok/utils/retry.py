@@ -42,4 +42,24 @@ def rate_limited(error: Exception) -> bool:
     return status == 429 or code == "rate_limit_exceeded"
 
 
-__all__ = ["pick_token", "rate_limited"]
+def transient_upstream(error: Exception) -> bool:
+    """Whether error is likely transient and safe to retry with another token."""
+    if not isinstance(error, UpstreamException):
+        return False
+    details = error.details or {}
+    status = details.get("status")
+    err = str(details.get("error") or error).lower()
+    transient_status = {408, 500, 502, 503, 504}
+    if status in transient_status:
+        return True
+    timeout_markers = (
+        "timed out",
+        "timeout",
+        "connection reset",
+        "temporarily unavailable",
+        "http2",
+    )
+    return any(marker in err for marker in timeout_markers)
+
+
+__all__ = ["pick_token", "rate_limited", "transient_upstream"]
