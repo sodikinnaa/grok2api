@@ -482,6 +482,13 @@ class ChatService:
                     continue
 
                 if transient_upstream(e):
+                    has_alternative_token = False
+                    for pool_name in ModelService.pool_candidates_for_model(model):
+                        if token_mgr.get_token(pool_name, exclude=tried_tokens):
+                            has_alternative_token = True
+                            break
+                    if not has_alternative_token:
+                        raise
                     logger.warning(
                         f"Transient upstream error for token {token[:10]}..., "
                         f"trying next token (attempt {attempt + 1}/{max_token_retries}): {e}"
