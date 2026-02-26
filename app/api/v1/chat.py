@@ -628,7 +628,6 @@ async def chat_completions(request: ChatCompletionRequest):
                 param="image",
                 code="missing_image",
             )
-        image_url = image_urls[-1]
 
         is_stream = (
             request.stream if request.stream is not None else get_config("app.stream")
@@ -661,7 +660,7 @@ async def chat_completions(request: ChatCompletionRequest):
             token=token,
             model_info=model_info,
             prompt=prompt,
-            images=[image_url],
+            images=image_urls,
             n=n,
             response_format=response_format,
             stream=bool(is_stream),
