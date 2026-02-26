@@ -436,6 +436,7 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
 
     async def process(self, response: AsyncIterable[dict]) -> AsyncGenerator[str, None]:
         images: Dict[str, Dict] = {}
+        emitted_chat_chunk = False
 
         async for item in response:
             if item.get("type") == "error":
@@ -515,6 +516,7 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
                     if not self._id_generated:
                         self._response_id = make_response_id()
                         self._id_generated = True
+                    emitted_chat_chunk = True
                     yield self._sse(
                         "chat.completion.chunk",
                         make_chat_chunk(
@@ -593,6 +595,7 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
 
             if self.chat_format:
                 # OpenAI ChatCompletion chunk format
+                emitted_chat_chunk = True
                 yield self._sse(
                     "chat.completion.chunk",
                     make_chat_chunk(
@@ -623,6 +626,23 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
                         },
                     },
                 )
+
+        if self.chat_format:
+            if not self._id_generated:
+                self._response_id = make_response_id()
+                self._id_generated = True
+            if not emitted_chat_chunk:
+                yield self._sse(
+                    "chat.completion.chunk",
+                    make_chat_chunk(
+                        self._response_id,
+                        self.model,
+                        "",
+                        index=0,
+                        is_final=True,
+                    ),
+                )
+            yield "data: [DONE]\n\n"
 
 
 class ImageWSCollectProcessor(ImageWSBaseProcessor):

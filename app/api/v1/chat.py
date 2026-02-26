@@ -78,6 +78,7 @@ ALLOWED_IMAGE_SIZES = {
     "1024x1792",
     "1024x1024",
 }
+SUPERIMAGE_MODEL_ID = "grok-superimage-1.0"
 
 
 def _validate_media_input(value: str, field_name: str, param: str):
@@ -164,6 +165,17 @@ def _image_field(response_format: str) -> str:
     if response_format == "url":
         return "url"
     return "b64_json"
+
+
+def _superimage_server_image_config() -> ImageConfig:
+    """Load server-side image generation parameters for grok-superimage-1.0."""
+    n = int(get_config("superimage.n", 1) or 1)
+    size = str(get_config("superimage.size", "1024x1024") or "1024x1024")
+    response_format = str(
+        get_config("superimage.response_format", get_config("app.image_format") or "url")
+        or "url"
+    )
+    return ImageConfig(n=n, size=size, response_format=response_format)
 
 def _validate_image_config(image_conf: ImageConfig, *, stream: bool):
     n = image_conf.n or 1
@@ -514,7 +526,7 @@ def validate_request(request: ChatCompletionRequest):
                 param="messages",
                 code="empty_prompt",
             )
-        image_conf = request.image_config or ImageConfig()
+        image_conf = _superimage_server_image_config() if request.model == SUPERIMAGE_MODEL_ID else (request.image_config or ImageConfig())
         n = image_conf.n or 1
         if not (1 <= n <= 10):
             raise ValidationException(
@@ -685,7 +697,7 @@ async def chat_completions(request: ChatCompletionRequest):
         is_stream = (
             request.stream if request.stream is not None else get_config("app.stream")
         )
-        image_conf = request.image_config or ImageConfig()
+        image_conf = _superimage_server_image_config() if request.model == SUPERIMAGE_MODEL_ID else (request.image_config or ImageConfig())
         _validate_image_config(image_conf, stream=bool(is_stream))
         response_format = _resolve_image_format(image_conf.response_format)
         response_field = _image_field(response_format)
