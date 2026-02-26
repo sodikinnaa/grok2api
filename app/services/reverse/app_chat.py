@@ -17,6 +17,19 @@ from app.services.reverse.utils.retry import retry_on_status
 CHAT_API = "https://grok.com/rest/app-chat/conversations/new"
 
 
+def _normalize_chat_proxy(proxy_url: str) -> str:
+    """Normalize proxy URL for curl-cffi app-chat requests."""
+    if not proxy_url:
+        return proxy_url
+    parsed = urlparse(proxy_url)
+    scheme = parsed.scheme.lower()
+    if scheme == "socks5":
+        return proxy_url.replace("socks5://", "socks5h://", 1)
+    if scheme == "socks4":
+        return proxy_url.replace("socks4://", "socks4a://", 1)
+    return proxy_url
+
+
 class AppChatReverse:
     """/rest/app-chat/conversations/new reverse interface."""
 
@@ -106,14 +119,15 @@ class AppChatReverse:
             proxy = None
             proxies = None
             if base_proxy:
-                scheme = urlparse(base_proxy).scheme.lower()
+                normalized_proxy = _normalize_chat_proxy(base_proxy)
+                scheme = urlparse(normalized_proxy).scheme.lower()
                 if scheme.startswith("socks"):
                     # curl_cffi 对 SOCKS 代理优先使用 proxy 参数，避免被按 HTTP CONNECT 处理
-                    proxy = base_proxy
+                    proxy = normalized_proxy
                 else:
-                    proxies = {"http": base_proxy, "https": base_proxy}
+                    proxies = {"http": normalized_proxy, "https": normalized_proxy}
                 logger.info(
-                    f"AppChatReverse proxy enabled: scheme={scheme}, target={base_proxy}"
+                    f"AppChatReverse proxy enabled: scheme={scheme}, target={normalized_proxy}"
                 )
             else:
                 logger.warning("AppChatReverse proxy is empty, request will use direct network")
