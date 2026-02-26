@@ -348,22 +348,7 @@ class ImageStreamProcessor(BaseProcessor):
 
                     out_index = 0 if self.n == 1 else image_index
 
-                    if self.chat_format:
-                        # OpenAI ChatCompletion chunk format for partial
-                        if not self._id_generated:
-                            self._response_id = make_response_id()
-                            self._id_generated = True
-                        emitted_chat_chunk = True
-                        yield self._sse(
-                            "chat.completion.chunk",
-                            make_chat_chunk(
-                                self._response_id,
-                                self.model,
-                                "",
-                                index=out_index,
-                            ),
-                        )
-                    else:
+                    if not self.chat_format:
                         yield self._sse(
                             "image_generation.partial_image",
                             {

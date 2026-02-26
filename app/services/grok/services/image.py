@@ -476,6 +476,9 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
                 continue
 
             if item.get("stage") != "final":
+                # Chat Completions image stream should only expose final results.
+                if self.chat_format:
+                    continue
                 if image_id not in self._initial_sent:
                     self._initial_sent.add(image_id)
                     stage = item.get("stage") or "preview"

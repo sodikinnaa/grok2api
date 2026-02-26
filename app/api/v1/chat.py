@@ -2,7 +2,7 @@
 Chat Completions API 路由
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, AsyncGenerator, AsyncIterable, Dict, List, Optional, Union
 import base64
 import binascii
 import time
@@ -11,6 +11,7 @@ import uuid
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
+import orjson
 
 from app.services.grok.services.chat import ChatService
 from app.services.grok.services.image import ImageGenerationService
@@ -176,6 +177,62 @@ def _superimage_server_image_config() -> ImageConfig:
         or "url"
     )
     return ImageConfig(n=n, size=size, response_format=response_format)
+
+
+async def _safe_sse_stream(stream: AsyncIterable[str]) -> AsyncGenerator[str, None]:
+    """Ensure streaming endpoints return SSE error payloads instead of transport-level 5xx breaks."""
+    try:
+        async for chunk in stream:
+            yield chunk
+    except AppException as e:
+        payload = {
+            "error": {
+                "message": e.message,
+                "type": e.error_type,
+                "code": e.code,
+            }
+        }
+        yield f"event: error\ndata: {orjson.dumps(payload).decode()}\n\n"
+        yield "data: [DONE]\n\n"
+    except Exception as e:
+        payload = {
+            "error": {
+                "message": str(e) or "stream_error",
+                "type": "server_error",
+                "code": "stream_error",
+            }
+        }
+        yield f"event: error\ndata: {orjson.dumps(payload).decode()}\n\n"
+        yield "data: [DONE]\n\n"
+
+
+def _streaming_error_response(exc: Exception) -> StreamingResponse:
+    if isinstance(exc, AppException):
+        payload = {
+            "error": {
+                "message": exc.message,
+                "type": exc.error_type,
+                "code": exc.code,
+            }
+        }
+    else:
+        payload = {
+            "error": {
+                "message": str(exc) or "stream_error",
+                "type": "server_error",
+                "code": "stream_error",
+            }
+        }
+
+    async def _one_shot_error() -> AsyncGenerator[str, None]:
+        yield f"event: error\ndata: {orjson.dumps(payload).decode()}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        _one_shot_error(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 def _validate_image_config(image_conf: ImageConfig, *, stream: bool):
     n = image_conf.n or 1
@@ -681,7 +738,7 @@ async def chat_completions(request: ChatCompletionRequest):
 
         if result.stream:
             return StreamingResponse(
-                result.data,
+                _safe_sse_stream(result.data),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
             )
@@ -744,7 +801,7 @@ async def chat_completions(request: ChatCompletionRequest):
 
         if result.stream:
             return StreamingResponse(
-                result.data,
+                _safe_sse_stream(result.data),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
             )
@@ -759,34 +816,44 @@ async def chat_completions(request: ChatCompletionRequest):
         # 提取视频配置 (默认值在 Pydantic 模型中处理)
         v_conf = request.video_config or VideoConfig()
 
-        result = await VideoService.completions(
-            model=request.model,
-            messages=[msg.model_dump() for msg in request.messages],
-            stream=request.stream,
-            reasoning_effort=request.reasoning_effort,
-            aspect_ratio=v_conf.aspect_ratio,
-            video_length=v_conf.video_length,
-            resolution=v_conf.resolution_name,
-            preset=v_conf.preset,
-        )
+        try:
+            result = await VideoService.completions(
+                model=request.model,
+                messages=[msg.model_dump() for msg in request.messages],
+                stream=request.stream,
+                reasoning_effort=request.reasoning_effort,
+                aspect_ratio=v_conf.aspect_ratio,
+                video_length=v_conf.video_length,
+                resolution=v_conf.resolution_name,
+                preset=v_conf.preset,
+            )
+        except Exception as e:
+            if request.stream is not False:
+                return _streaming_error_response(e)
+            raise
     else:
-        result = await ChatService.completions(
-            model=request.model,
-            messages=[msg.model_dump() for msg in request.messages],
-            stream=request.stream,
-            reasoning_effort=request.reasoning_effort,
-            temperature=request.temperature,
-            top_p=request.top_p,
-            tools=request.tools,
-            tool_choice=request.tool_choice,
-            parallel_tool_calls=request.parallel_tool_calls,
-        )
+        try:
+            result = await ChatService.completions(
+                model=request.model,
+                messages=[msg.model_dump() for msg in request.messages],
+                stream=request.stream,
+                reasoning_effort=request.reasoning_effort,
+                temperature=request.temperature,
+                top_p=request.top_p,
+                tools=request.tools,
+                tool_choice=request.tool_choice,
+                parallel_tool_calls=request.parallel_tool_calls,
+            )
+        except Exception as e:
+            if request.stream is not False:
+                return _streaming_error_response(e)
+            raise
 
     if isinstance(result, dict):
         return JSONResponse(content=result)
     else:
         return StreamingResponse(
-            result,
+            _safe_sse_stream(result),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
         )
