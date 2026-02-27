@@ -66,7 +66,7 @@ class ImageEditService:
             )
             images = images[-3:]
 
-        max_token_retries = int(get_config("retry.max_retry"))
+        max_token_retries = int(get_config("retry.max_retry") or 3)
         tried_tokens: set[str] = set()
         last_error: Exception | None = None
 
@@ -323,6 +323,7 @@ class ImageStreamProcessor(BaseProcessor):
     ) -> AsyncGenerator[str, None]:
         """Process stream response."""
         final_images = []
+        emitted_chat_chunk = False
         idle_timeout = get_config("image.stream_timeout")
 
         try:
@@ -347,21 +348,7 @@ class ImageStreamProcessor(BaseProcessor):
 
                     out_index = 0 if self.n == 1 else image_index
 
-                    if self.chat_format:
-                        # OpenAI ChatCompletion chunk format for partial
-                        if not self._id_generated:
-                            self._response_id = make_response_id()
-                            self._id_generated = True
-                        yield self._sse(
-                            "chat.completion.chunk",
-                            make_chat_chunk(
-                                self._response_id,
-                                self.model,
-                                "",
-                                index=out_index,
-                            ),
-                        )
-                    else:
+                    if not self.chat_format:
                         yield self._sse(
                             "image_generation.partial_image",
                             {
@@ -421,6 +408,7 @@ class ImageStreamProcessor(BaseProcessor):
 
                 if self.chat_format:
                     # OpenAI ChatCompletion chunk format
+                    emitted_chat_chunk = True
                     yield self._sse(
                         "chat.completion.chunk",
                         make_chat_chunk(
@@ -450,6 +438,23 @@ class ImageStreamProcessor(BaseProcessor):
                             },
                         },
                     )
+
+            if self.chat_format:
+                if not self._id_generated:
+                    self._response_id = make_response_id()
+                    self._id_generated = True
+                if not emitted_chat_chunk:
+                    yield self._sse(
+                        "chat.completion.chunk",
+                        make_chat_chunk(
+                            self._response_id,
+                            self.model,
+                            "",
+                            index=0,
+                            is_final=True,
+                        ),
+                    )
+                yield "data: [DONE]\n\n"
         except asyncio.CancelledError:
             logger.debug("Image stream cancelled by client")
         except StreamIdleTimeoutError as e:
