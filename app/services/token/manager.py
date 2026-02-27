@@ -3,7 +3,7 @@
 import asyncio
 import time
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 from app.core.logger import logger
 from app.services.token.models import (
@@ -286,7 +286,7 @@ class TokenManager:
             if self._dirty:
                 self._schedule_save()
 
-    def get_token(self, pool_name: str = "ssoBasic", exclude: set = None) -> Optional[str]:
+    def get_token(self, pool_name: str = "ssoBasic", exclude: set = None, prefer_tags: Optional[Set[str]] = None) -> Optional[str]:
         """
         获取可用 Token
 
@@ -302,7 +302,7 @@ class TokenManager:
             logger.warning(f"Pool '{pool_name}' not found")
             return None
 
-        token_info = pool.select(exclude=exclude)
+        token_info = pool.select(exclude=exclude, prefer_tags=prefer_tags)
         if not token_info:
             logger.warning(f"No available token in pool '{pool_name}'")
             return None
@@ -312,7 +312,7 @@ class TokenManager:
             return token[4:]
         return token
 
-    def get_token_info(self, pool_name: str = "ssoBasic") -> Optional["TokenInfo"]:
+    def get_token_info(self, pool_name: str = "ssoBasic", prefer_tags: Optional[Set[str]] = None) -> Optional["TokenInfo"]:
         """
         获取可用 Token 的完整信息
 
@@ -327,7 +327,7 @@ class TokenManager:
             logger.warning(f"Pool '{pool_name}' not found")
             return None
 
-        token_info = pool.select()
+        token_info = pool.select(prefer_tags=prefer_tags)
         if not token_info:
             logger.warning(f"No available token in pool '{pool_name}'")
             return None
