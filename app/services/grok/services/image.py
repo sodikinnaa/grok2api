@@ -52,7 +52,7 @@ class ImageGenerationService:
         enable_nsfw: Optional[bool] = None,
         chat_format: bool = False,
     ) -> ImageGenerationResult:
-        max_token_retries = int(get_config("retry.max_retry"))
+        max_token_retries = int(get_config("retry.max_retry") or 3)
         tried_tokens: set[str] = set()
         last_error: Optional[Exception] = None
 

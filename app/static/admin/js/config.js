@@ -110,14 +110,6 @@ const LOCALE_MAP = {
   },
 
 
-  "superimage": {
-    "label": "SuperImage 配置",
-    "n": { title: "生成数量", desc: "仅用于 grok-superimage-1.0 的服务端统一生成数量（1-10）。" },
-    "size": { title: "图片尺寸", desc: "仅用于 grok-superimage-1.0 的服务端统一尺寸。" },
-    "response_format": { title: "响应格式", desc: "仅用于 grok-superimage-1.0 的服务端统一返回格式。" }
-  },
-
-
   "asset": {
     "label": "资产配置",
     "upload_concurrent": { title: "上传并发", desc: "上传接口的最大并发数。推荐 30。" },

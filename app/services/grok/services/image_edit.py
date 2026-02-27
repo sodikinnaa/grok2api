@@ -66,7 +66,7 @@ class ImageEditService:
             )
             images = images[-3:]
 
-        max_token_retries = int(get_config("retry.max_retry"))
+        max_token_retries = int(get_config("retry.max_retry") or 3)
         tried_tokens: set[str] = set()
         last_error: Exception | None = None
 

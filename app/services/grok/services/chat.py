@@ -411,7 +411,7 @@ class ChatService:
 
         # 跨 Token 重试循环
         tried_tokens = set()
-        max_token_retries = int(get_config("retry.max_retry"))
+        max_token_retries = int(get_config("retry.max_retry") or 3)
         last_error = None
 
         for attempt in range(max_token_retries):
