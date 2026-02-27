@@ -259,6 +259,48 @@ class ImageGenerationService:
             if len(all_images) >= n:
                 break
 
+        # If upstream likely blocked/reviewed some images, run extra parallel attempts
+        # and only keep valid finals selected by ws_imagine classification.
+        if len(all_images) < n:
+            remaining = n - len(all_images)
+            extra_attempts = int(get_config("image.blocked_parallel_attempts") or 5)
+            extra_attempts = max(0, min(extra_attempts, 10))
+            if extra_attempts > 0:
+                logger.warning(
+                    f"Image finals insufficient ({len(all_images)}/{n}), running "
+                    f"{extra_attempts} parallel recovery attempts for remaining={remaining}"
+                )
+                extra_tasks = [
+                    _fetch_batch(min(expected_per_call, remaining))
+                    for _ in range(extra_attempts)
+                ]
+                extra_results = await asyncio.gather(*extra_tasks, return_exceptions=True)
+                for batch in extra_results:
+                    if isinstance(batch, Exception):
+                        logger.warning(f"WS recovery batch failed: {batch}")
+                        continue
+                    for img in batch:
+                        if img not in seen:
+                            seen.add(img)
+                            all_images.append(img)
+                        if len(all_images) >= n:
+                            break
+                    if len(all_images) >= n:
+                        break
+
+        if len(all_images) < n:
+            logger.error(
+                f"Image generation failed after recovery attempts: finals={len(all_images)}/{n}"
+            )
+            raise UpstreamException(
+                "Image generation blocked or no valid final image",
+                details={
+                    "error_code": "blocked_no_final_image",
+                    "final_images": len(all_images),
+                    "requested": n,
+                },
+            )
+
         try:
             await token_mgr.consume(token, self._get_effort(model_info))
         except Exception as e:
@@ -436,6 +478,7 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
 
     async def process(self, response: AsyncIterable[dict]) -> AsyncGenerator[str, None]:
         images: Dict[str, Dict] = {}
+        emitted_chat_chunk = False
 
         async for item in response:
             if item.get("type") == "error":
@@ -475,6 +518,9 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
                 continue
 
             if item.get("stage") != "final":
+                # Chat Completions image stream should only expose final results.
+                if self.chat_format:
+                    continue
                 if image_id not in self._initial_sent:
                     self._initial_sent.add(image_id)
                     stage = item.get("stage") or "preview"
@@ -515,6 +561,7 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
                     if not self._id_generated:
                         self._response_id = make_response_id()
                         self._id_generated = True
+                    emitted_chat_chunk = True
                     yield self._sse(
                         "chat.completion.chunk",
                         make_chat_chunk(
@@ -541,33 +588,36 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
                     )
 
         if self.n == 1:
-            if self._target_id and self._target_id in images:
+            if (
+                self._target_id
+                and self._target_id in images
+                and images[self._target_id].get("is_final", False)
+            ):
                 selected = [(self._target_id, images[self._target_id])]
             else:
+                final_candidates = [
+                    item for item in images.items() if item[1].get("is_final", False)
+                ]
                 selected = (
-                    [
-                        max(
-                            images.items(),
-                            key=lambda x: (
-                                x[1].get("is_final", False),
-                                x[1].get("blob_size", 0),
-                            ),
-                        )
-                    ]
-                    if images
+                    [max(final_candidates, key=lambda x: x[1].get("blob_size", 0))]
+                    if final_candidates
                     else []
                 )
         else:
             selected = [
                 (image_id, images[image_id])
                 for image_id in self._index_map
-                if image_id in images
+                if image_id in images and images[image_id].get("is_final", False)
             ]
 
         for image_id, item in selected:
             if self.response_format == "url":
+                final_image_id = image_id
+                # Keep original imagine image name for superimage chat stream output.
+                if self.model != "grok-superimage-1.0":
+                    final_image_id = f"{image_id}-final"
                 output = await self._save_blob(
-                    f"{image_id}-final",
+                    final_image_id,
                     item.get("blob", ""),
                     item.get("is_final", False),
                     ext=item.get("ext"),
@@ -593,6 +643,7 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
 
             if self.chat_format:
                 # OpenAI ChatCompletion chunk format
+                emitted_chat_chunk = True
                 yield self._sse(
                     "chat.completion.chunk",
                     make_chat_chunk(
@@ -624,6 +675,23 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
                     },
                 )
 
+        if self.chat_format:
+            if not self._id_generated:
+                self._response_id = make_response_id()
+                self._id_generated = True
+            if not emitted_chat_chunk:
+                yield self._sse(
+                    "chat.completion.chunk",
+                    make_chat_chunk(
+                        self._response_id,
+                        self.model,
+                        "",
+                        index=0,
+                        is_final=True,
+                    ),
+                )
+            yield "data: [DONE]\n\n"
+
 
 class ImageWSCollectProcessor(ImageWSBaseProcessor):
     """WebSocket image non-stream processor."""
@@ -649,8 +717,8 @@ class ImageWSCollectProcessor(ImageWSBaseProcessor):
             images[image_id] = self._pick_best(images.get(image_id), item)
 
         selected = sorted(
-            images.values(),
-            key=lambda x: (x.get("is_final", False), x.get("blob_size", 0)),
+            [item for item in images.values() if item.get("is_final", False)],
+            key=lambda x: x.get("blob_size", 0),
             reverse=True,
         )
         if self.n:

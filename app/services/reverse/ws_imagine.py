@@ -37,10 +37,9 @@ class ImagineWebSocketReverse:
         return match.group(1), match.group(2).lower()
 
     def _is_final_image(self, url: str, blob_size: int, final_min_bytes: int) -> bool:
-        url_lower = (url or "").lower()
-        if url_lower.endswith((".jpg", ".jpeg")):
-            return True
-        return blob_size > final_min_bytes
+        # Final image must satisfy byte-size threshold to avoid tiny preview
+        # images being treated as final outputs.
+        return blob_size >= final_min_bytes
 
     def _classify_image(self, url: str, blob: str, final_min_bytes: int, medium_min_bytes: int) -> Optional[Dict[str, object]]:
         if not url or not blob:
@@ -198,6 +197,10 @@ class ImagineWebSocketReverse:
                             and completed == 0
                             and now - medium_received_time > blocked_grace
                         ):
+                            logger.warning(
+                                "Imagine stream blocked suspected: received medium preview but no valid final image "
+                                f"within {blocked_grace:.1f}s (request_id={request_id})"
+                            )
                             raise _BlockedError()
                         if completed > 0 and now - last_activity > 10:
                             logger.info(
@@ -259,6 +262,11 @@ class ImagineWebSocketReverse:
                             and completed == 0
                             and time.monotonic() - medium_received_time > final_timeout
                         ):
+                            logger.warning(
+                                "Imagine stream final-timeout suspected review/block: "
+                                f"no final image reached threshold in {final_timeout:.1f}s "
+                                f"(request_id={request_id})"
+                            )
                             raise _BlockedError()
 
                     elif ws_msg.type in (

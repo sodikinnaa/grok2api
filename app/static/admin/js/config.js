@@ -29,6 +29,7 @@ const NUMERIC_FIELDS = new Set([
   'final_timeout',
   'final_min_bytes',
   'medium_min_bytes',
+  'blocked_parallel_attempts',
   'concurrent',
   'batch_size'
 ]);
@@ -96,7 +97,16 @@ const LOCALE_MAP = {
     "final_timeout": { title: "最终图超时", desc: "收到中等图后等待最终图的超时秒数。" },
     "nsfw": { title: "NSFW 模式", desc: "WebSocket 请求是否启用 NSFW。" },
     "medium_min_bytes": { title: "中等图最小字节", desc: "判定中等质量图的最小字节数。" },
-    "final_min_bytes": { title: "最终图最小字节", desc: "判定最终图的最小字节数（通常 JPG > 100KB）。" }
+    "final_min_bytes": { title: "最终图最小字节", desc: "判定最终图的最小字节数（通常 JPG > 100KB）。" },
+    "blocked_parallel_attempts": { title: "拦截补偿并发次数", desc: "疑似审查/拦截导致无最终图时，自动并行补偿生成次数。" }
+  },
+
+
+  "superimage": {
+    "label": "SuperImage 配置",
+    "n": { title: "生成数量", desc: "仅用于 grok-superimage-1.0 的服务端统一生成数量（1-10）。" },
+    "size": { title: "图片尺寸", desc: "仅用于 grok-superimage-1.0 的服务端统一尺寸。" },
+    "response_format": { title: "响应格式", desc: "仅用于 grok-superimage-1.0 的服务端统一返回格式。" }
   },
 
 
@@ -410,6 +420,22 @@ function buildFieldCard(section, key, val) {
     built = buildSelectInput(section, key, val, [
       { val: 'html', text: 'HTML' },
       { val: 'url', text: 'URL' }
+    ]);
+  }
+  else if (section === 'superimage' && key === 'size') {
+    built = buildSelectInput(section, key, val, [
+      { val: '1024x1024', text: '1024x1024 (1:1)' },
+      { val: '1280x720', text: '1280x720 (16:9)' },
+      { val: '720x1280', text: '720x1280 (9:16)' },
+      { val: '1792x1024', text: '1792x1024 (3:2)' },
+      { val: '1024x1792', text: '1024x1792 (2:3)' }
+    ]);
+  }
+  else if (section === 'superimage' && key === 'response_format') {
+    built = buildSelectInput(section, key, val, [
+      { val: 'url', text: 'URL' },
+      { val: 'b64_json', text: 'B64 JSON' },
+      { val: 'base64', text: 'Base64' }
     ]);
   }
   else if (Array.isArray(val) || typeof val === 'object') {
