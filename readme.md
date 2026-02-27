@@ -180,6 +180,7 @@ curl http://localhost:8000/v1/chat/completions \
 - 工具调用为**提示词模拟 + 客户端执行回填**：模型通过 `<tool_call>{...}</tool_call>` 输出调用请求，服务端解析为 `tool_calls`；不执行工具。
 - `grok-superimage-1.0` 与瀑布流 imagine 生成链路一致，可直接通过 `/v1/chat/completions` 调用；其 `n/size/response_format` 由服务端 `[superimage]` 统一控制。
 - `grok-superimage-1.0` 在 `/v1/chat/completions` 的流式输出仅返回最终成图，不返回中间预览图。
+- `grok-superimage-1.0` 流式 URL 出图会保持原始图片名（不追加 `-final` 后缀）。
 - `grok-imagine-1.0-edit` 必须提供图片，多图默认取**最后 3 张**与最后一个文本。
 - `grok-imagine-1.0-video` 支持文生视频与图生视频（通过 `image_url` 传参考图，**仅取第 1 张**）。
 - 除上述外的其他参数将自动丢弃并忽略。
