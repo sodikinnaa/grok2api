@@ -180,12 +180,15 @@ class ImageGenerationService:
     ) -> ImageGenerationResult:
         if enable_nsfw is None:
             enable_nsfw = bool(get_config("image.nsfw"))
+        stream_retries = int(get_config("image.blocked_parallel_attempts") or 5) + 1
+        stream_retries = max(1, min(stream_retries, 10))
         upstream = image_service.stream(
             token=token,
             prompt=prompt,
             aspect_ratio=aspect_ratio,
             n=n,
             enable_nsfw=enable_nsfw,
+            max_retries=stream_retries,
         )
         processor = ImageWSStreamProcessor(
             model_info.model_id,
@@ -287,10 +290,15 @@ class ImageGenerationService:
                             break
                     if len(all_images) >= n:
                         break
+                logger.info(
+                    f"Image recovery attempts completed: finals={len(all_images)}/{n}, "
+                    f"attempts={extra_attempts}"
+                )
 
         if len(all_images) < n:
             logger.error(
-                f"Image generation failed after recovery attempts: finals={len(all_images)}/{n}"
+                f"Image generation failed after recovery attempts: finals={len(all_images)}/{n}, "
+                f"blocked_parallel_attempts={int(get_config('image.blocked_parallel_attempts') or 5)}"
             )
             raise UpstreamException(
                 "Image generation blocked or no valid final image",

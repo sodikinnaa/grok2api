@@ -250,18 +250,29 @@ class Config:
 
             # 自动回填缺失配置到存储
             # 或迁移了配置后需要更新
+            # 保护：当远程存储返回 None 且本地也没有可迁移配置时，不覆盖远程配置，避免误重置。
+            has_local_seed = bool(config_data)
+            allow_bootstrap_empty_remote = (
+                (not from_remote) and has_local_seed
+            )
             should_persist = (
-                (not from_remote) or (merged != config_data) or deprecated_sections
+                allow_bootstrap_empty_remote
+                or (merged != config_data and bool(config_data))
+                or deprecated_sections
             )
             if should_persist:
                 async with storage.acquire_lock("config_save", timeout=10):
                     await storage.save_config(merged)
-                if not from_remote:
+                if not from_remote and has_local_seed:
                     logger.info(
                         f"Initialized remote storage ({storage.__class__.__name__}) with config baseline."
                     )
                 if deprecated_sections:
                     logger.info("Configuration automatically migrated and cleaned.")
+            elif not from_remote and not has_local_seed:
+                logger.warning(
+                    "Skip persisting defaults: empty config source detected, keep runtime merged config only."
+                )
 
             self._config = merged
         except Exception as e:

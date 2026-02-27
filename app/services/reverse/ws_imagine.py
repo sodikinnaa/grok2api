@@ -115,15 +115,18 @@ class ImagineWebSocketReverse:
                     yield item
                 return
             except _BlockedError:
-                if yielded_any or attempt + 1 >= retries:
-                    if not yielded_any:
-                        yield {
-                            "type": "error",
-                            "error_code": "blocked",
-                            "error": "blocked_no_final_image",
-                        }
-                    return
-                logger.warning(f"WebSocket blocked, retry {attempt + 1}/{retries}")
+                if attempt + 1 < retries:
+                    logger.warning(
+                        f"WebSocket blocked/reviewed, retry {attempt + 1}/{retries}"
+                    )
+                    continue
+                yield {
+                    "type": "error",
+                    "error_code": "blocked",
+                    "error": "blocked_no_final_image",
+                    "yielded_partial": yielded_any,
+                }
+                return
             except Exception as e:
                 logger.error(f"WebSocket stream failed: {e}")
                 yield {
