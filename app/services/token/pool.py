@@ -1,7 +1,7 @@
 """Token 池管理"""
 
 import random
-from typing import Dict, List, Optional, Iterator
+from typing import Dict, List, Optional, Iterator, Set
 
 from app.services.token.models import TokenInfo, TokenStatus, TokenPoolStats
 
@@ -28,13 +28,17 @@ class TokenPool:
         """获取 Token"""
         return self._tokens.get(token_str)
 
-    def select(self, exclude: set = None) -> Optional[TokenInfo]:
+    def select(self, exclude: set = None, prefer_tags: Optional[Set[str]] = None) -> Optional[TokenInfo]:
         """
         选择一个可用 Token
         策略:
         1. 选择 active 状态且有配额的 token
         2. 优先选择剩余额度最多的
         3. 如果额度相同，随机选择（避免并发冲突）
+
+        Args:
+            exclude: 需要排除的 token 字符串集合
+            prefer_tags: 优先选择包含这些 tag 的 token（若存在则仅在其子集中选择）
         """
         # 选择 token
         available = [
@@ -46,6 +50,12 @@ class TokenPool:
 
         if not available:
             return None
+
+        # 优先选带指定标签的 token（若存在）
+        if prefer_tags:
+            preferred = [t for t in available if prefer_tags.issubset(set(t.tags or []))]
+            if preferred:
+                available = preferred
 
         # 找到最大额度
         max_quota = max(t.quota for t in available)
