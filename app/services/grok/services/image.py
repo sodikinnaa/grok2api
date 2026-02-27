@@ -259,6 +259,48 @@ class ImageGenerationService:
             if len(all_images) >= n:
                 break
 
+        # If upstream likely blocked/reviewed some images, run extra parallel attempts
+        # and only keep valid finals selected by ws_imagine classification.
+        if len(all_images) < n:
+            remaining = n - len(all_images)
+            extra_attempts = int(get_config("image.blocked_parallel_attempts") or 5)
+            extra_attempts = max(0, min(extra_attempts, 10))
+            if extra_attempts > 0:
+                logger.warning(
+                    f"Image finals insufficient ({len(all_images)}/{n}), running "
+                    f"{extra_attempts} parallel recovery attempts for remaining={remaining}"
+                )
+                extra_tasks = [
+                    _fetch_batch(min(expected_per_call, remaining))
+                    for _ in range(extra_attempts)
+                ]
+                extra_results = await asyncio.gather(*extra_tasks, return_exceptions=True)
+                for batch in extra_results:
+                    if isinstance(batch, Exception):
+                        logger.warning(f"WS recovery batch failed: {batch}")
+                        continue
+                    for img in batch:
+                        if img not in seen:
+                            seen.add(img)
+                            all_images.append(img)
+                        if len(all_images) >= n:
+                            break
+                    if len(all_images) >= n:
+                        break
+
+        if len(all_images) < n:
+            logger.error(
+                f"Image generation failed after recovery attempts: finals={len(all_images)}/{n}"
+            )
+            raise UpstreamException(
+                "Image generation blocked or no valid final image",
+                details={
+                    "error_code": "blocked_no_final_image",
+                    "final_images": len(all_images),
+                    "requested": n,
+                },
+            )
+
         try:
             await token_mgr.consume(token, self._get_effort(model_info))
         except Exception as e:

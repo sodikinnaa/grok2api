@@ -197,6 +197,10 @@ class ImagineWebSocketReverse:
                             and completed == 0
                             and now - medium_received_time > blocked_grace
                         ):
+                            logger.warning(
+                                "Imagine stream blocked suspected: received medium preview but no valid final image "
+                                f"within {blocked_grace:.1f}s (request_id={request_id})"
+                            )
                             raise _BlockedError()
                         if completed > 0 and now - last_activity > 10:
                             logger.info(
@@ -258,6 +262,11 @@ class ImagineWebSocketReverse:
                             and completed == 0
                             and time.monotonic() - medium_received_time > final_timeout
                         ):
+                            logger.warning(
+                                "Imagine stream final-timeout suspected review/block: "
+                                f"no final image reached threshold in {final_timeout:.1f}s "
+                                f"(request_id={request_id})"
+                            )
                             raise _BlockedError()
 
                     elif ws_msg.type in (

@@ -181,6 +181,7 @@ curl http://localhost:8000/v1/chat/completions \
 - `grok-superimage-1.0` 与瀑布流 imagine 生成链路一致，可直接通过 `/v1/chat/completions` 调用；其 `n/size/response_format` 由服务端 `[superimage]` 统一控制。
 - `grok-superimage-1.0` 在 `/v1/chat/completions` 的流式输出仅返回最终成图，不返回中间预览图。
 - `grok-superimage-1.0` 流式 URL 出图会保持原始图片名（不追加 `-final` 后缀）。
+- 当图片疑似被审查拦截导致无最终图时，服务端会按 `image.blocked_parallel_attempts` 自动并行补偿生成；若仍无满足 `image.final_min_bytes` 的最终图则返回失败。
 - `grok-imagine-1.0-edit` 必须提供图片，多图默认取**最后 3 张**与最后一个文本。
 - `grok-imagine-1.0-video` 支持文生视频与图生视频（通过 `image_url` 传参考图，**仅取第 1 张**）。
 - 除上述外的其他参数将自动丢弃并忽略。
