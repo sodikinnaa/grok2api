@@ -56,13 +56,23 @@ class ImageGenerationService:
         tried_tokens: set[str] = set()
         last_error: Optional[Exception] = None
 
+        # resolve nsfw once for routing and upstream
+        if enable_nsfw is None:
+            enable_nsfw = bool(get_config("image.nsfw"))
+        prefer_tags = {"nsfw"} if enable_nsfw else None
+
         if stream:
+
             async def _stream_retry() -> AsyncGenerator[str, None]:
                 nonlocal last_error
                 for attempt in range(max_token_retries):
-                    preferred = token if attempt == 0 else None
+                    preferred = token if (attempt == 0 and not prefer_tags) else None
                     current_token = await pick_token(
-                        token_mgr, model_info.model_id, tried_tokens, preferred=preferred
+                        token_mgr,
+                        model_info.model_id,
+                        tried_tokens,
+                        preferred=preferred,
+                        prefer_tags=prefer_tags,
                     )
                     if not current_token:
                         if last_error:
@@ -118,9 +128,13 @@ class ImageGenerationService:
             return ImageGenerationResult(stream=True, data=_stream_retry())
 
         for attempt in range(max_token_retries):
-            preferred = token if attempt == 0 else None
+            preferred = token if (attempt == 0 and not prefer_tags) else None
             current_token = await pick_token(
-                token_mgr, model_info.model_id, tried_tokens, preferred=preferred
+                token_mgr,
+                model_info.model_id,
+                tried_tokens,
+                preferred=preferred,
+                prefer_tags=prefer_tags,
             )
             if not current_token:
                 if last_error:
@@ -180,12 +194,15 @@ class ImageGenerationService:
     ) -> ImageGenerationResult:
         if enable_nsfw is None:
             enable_nsfw = bool(get_config("image.nsfw"))
+        ws_retries = int(get_config("image.ws_retries", 1) or 1)
+        ws_retries = max(1, ws_retries)
         upstream = image_service.stream(
             token=token,
             prompt=prompt,
             aspect_ratio=aspect_ratio,
             n=n,
             enable_nsfw=enable_nsfw,
+            max_retries=ws_retries,
         )
         processor = ImageWSStreamProcessor(
             model_info.model_id,
@@ -224,12 +241,15 @@ class ImageGenerationService:
         calls_needed = min(calls_needed, n)
 
         async def _fetch_batch(call_target: int):
+            ws_retries = int(get_config("image.ws_retries", 1) or 1)
+            ws_retries = max(1, ws_retries)
             upstream = image_service.stream(
                 token=token,
                 prompt=prompt,
                 aspect_ratio=aspect_ratio,
                 n=call_target,
                 enable_nsfw=enable_nsfw,
+                max_retries=ws_retries,
             )
             processor = ImageWSCollectProcessor(
                 model_info.model_id,
