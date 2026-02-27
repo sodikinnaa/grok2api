@@ -109,6 +109,7 @@ docker compose up -d
 | `grok-4.1-thinking` | 4 | Basic/Super | 支持 | 支持 | - |
 | `grok-4.20-beta` | 1 | Basic/Super | 支持 | 支持 | - |
 | `grok-imagine-1.0` | - | Basic/Super | - | 支持 | - |
+| `grok-superimage-1.0` | - | Basic/Super | - | 支持 | - |
 | `grok-imagine-1.0-edit` | - | Basic/Super | - | 支持 | - |
 | `grok-imagine-1.0-video` | - | Basic/Super | - | - | 支持 |
 
@@ -151,7 +152,7 @@ curl http://localhost:8000/v1/chat/completions \
 | └─`video_length` | integer | 视频时长 (秒) | `6`, `10`, `15` |
 | └─`resolution_name` | string | 分辨率 | `480p`, `720p` |
 | └─`preset` | string | 风格预设 | `fun`, `normal`, `spicy`, `custom` |
-| `image_config` | object | **图片模型专用配置对象** | 支持：`grok-imagine-1.0` / `grok-imagine-1.0-edit` |
+| `image_config` | object | **图片模型专用配置对象** | 支持：`grok-imagine-1.0` / `grok-superimage-1.0` / `grok-imagine-1.0-edit` |
 | └─`n` | integer | 生成数量 | `1` ~ `10` |
 | └─`size` | string | 图片尺寸 | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
 | └─`response_format` | string | 响应格式 | `url`, `b64_json`, `base64` |
@@ -177,6 +178,10 @@ curl http://localhost:8000/v1/chat/completions \
 - `image_url/input_audio/file` 仅支持 URL 或 Data URI（`data:<mime>;base64,...`），裸 base64 会报错。
 - `reasoning_effort`：`none` 表示不输出思考，其他值都会输出思考内容。
 - 工具调用为**提示词模拟 + 客户端执行回填**：模型通过 `<tool_call>{...}</tool_call>` 输出调用请求，服务端解析为 `tool_calls`；不执行工具。
+- `grok-superimage-1.0` 与瀑布流 imagine 生成链路一致，可直接通过 `/v1/chat/completions` 调用；其 `n/size/response_format` 由服务端 `[superimage]` 统一控制。
+- `grok-superimage-1.0` 在 `/v1/chat/completions` 的流式输出仅返回最终成图，不返回中间预览图。
+- `grok-superimage-1.0` 流式 URL 出图会保持原始图片名（不追加 `-final` 后缀）。
+- 当图片疑似被审查拦截导致无最终图时，若开启 `image.blocked_parallel_enabled`，服务端会按 `image.blocked_parallel_attempts` 自动并行补偿生成，并优先使用不同 token；若仍无满足 `image.final_min_bytes` 的最终图则返回失败。
 - `grok-imagine-1.0-edit` 必须提供图片，多图默认取**最后 3 张**与最后一个文本。
 - `grok-imagine-1.0-video` 支持文生视频与图生视频（通过 `image_url` 传参考图，**仅取第 1 张**）。
 - 除上述外的其他参数将自动丢弃并忽略。

@@ -37,10 +37,9 @@ class ImagineWebSocketReverse:
         return match.group(1), match.group(2).lower()
 
     def _is_final_image(self, url: str, blob_size: int, final_min_bytes: int) -> bool:
-        url_lower = (url or "").lower()
-        if url_lower.endswith((".jpg", ".jpeg")):
-            return True
-        return blob_size > final_min_bytes
+        # Final image must satisfy byte-size threshold to avoid tiny preview
+        # images being treated as final outputs.
+        return blob_size >= final_min_bytes
 
     def _classify_image(self, url: str, blob: str, final_min_bytes: int, medium_min_bytes: int) -> Optional[Dict[str, object]]:
         if not url or not blob:
@@ -102,29 +101,64 @@ class ImagineWebSocketReverse:
         max_retries: Optional[int] = None,
     ) -> AsyncGenerator[Dict[str, object], None]:
         retries = max(1, max_retries if max_retries is not None else 1)
+        parallel_enabled = bool(get_config("image.blocked_parallel_enabled", True))
         logger.info(
             f"Image generation: prompt='{prompt[:50]}...', n={n}, ratio={aspect_ratio}, nsfw={enable_nsfw}"
         )
 
+        async def _collect_once() -> list[Dict[str, object]]:
+            items: list[Dict[str, object]] = []
+            async for item in self._stream_once(
+                token, prompt, aspect_ratio, n, enable_nsfw
+            ):
+                items.append(item)
+            return items
+
         for attempt in range(retries):
             try:
-                yielded_any = False
-                async for item in self._stream_once(
-                    token, prompt, aspect_ratio, n, enable_nsfw
-                ):
-                    yielded_any = True
+                items = await _collect_once()
+                for item in items:
                     yield item
                 return
             except _BlockedError:
-                if yielded_any or attempt + 1 >= retries:
-                    if not yielded_any:
-                        yield {
-                            "type": "error",
-                            "error_code": "blocked",
-                            "error": "blocked_no_final_image",
-                        }
+                retries_left = retries - (attempt + 1)
+                if retries_left > 0 and parallel_enabled:
+                    logger.warning(
+                        f"WebSocket blocked/reviewed, launching {retries_left} parallel retries"
+                    )
+                    tasks = [asyncio.create_task(_collect_once()) for _ in range(retries_left)]
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    for result in results:
+                        if isinstance(result, Exception):
+                            continue
+                        has_final = any(
+                            isinstance(item, dict)
+                            and item.get("type") == "image"
+                            and item.get("is_final")
+                            for item in result
+                        )
+                        if has_final:
+                            for item in result:
+                                yield item
+                            return
+                    yield {
+                        "type": "error",
+                        "error_code": "blocked",
+                        "error": "blocked_no_final_image",
+                        "parallel_attempts": retries_left,
+                    }
                     return
-                logger.warning(f"WebSocket blocked, retry {attempt + 1}/{retries}")
+                if attempt + 1 < retries:
+                    logger.warning(
+                        f"WebSocket blocked/reviewed, retry {attempt + 1}/{retries}"
+                    )
+                    continue
+                yield {
+                    "type": "error",
+                    "error_code": "blocked",
+                    "error": "blocked_no_final_image",
+                }
+                return
             except Exception as e:
                 logger.error(f"WebSocket stream failed: {e}")
                 yield {
@@ -198,6 +232,10 @@ class ImagineWebSocketReverse:
                             and completed == 0
                             and now - medium_received_time > blocked_grace
                         ):
+                            logger.warning(
+                                "Imagine stream blocked suspected: received medium preview but no valid final image "
+                                f"within {blocked_grace:.1f}s (request_id={request_id})"
+                            )
                             raise _BlockedError()
                         if completed > 0 and now - last_activity > 10:
                             logger.info(
@@ -259,6 +297,11 @@ class ImagineWebSocketReverse:
                             and completed == 0
                             and time.monotonic() - medium_received_time > final_timeout
                         ):
+                            logger.warning(
+                                "Imagine stream final-timeout suspected review/block: "
+                                f"no final image reached threshold in {final_timeout:.1f}s "
+                                f"(request_id={request_id})"
+                            )
                             raise _BlockedError()
 
                     elif ws_msg.type in (
