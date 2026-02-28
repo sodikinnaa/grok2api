@@ -654,8 +654,8 @@ class ImageWSStreamProcessor(ImageWSBaseProcessor):
         for image_id, item in selected:
             if self.response_format == "url":
                 final_image_id = image_id
-                # Keep original imagine image name for superimage chat stream output.
-                if self.model != "grok-superimage-1.0":
+                # Keep original imagine image name for imagine chat stream output.
+                if self.model != "grok-imagine-1.0-fast":
                     final_image_id = f"{image_id}-final"
                 output = await self._save_blob(
                     final_image_id,

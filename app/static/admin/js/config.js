@@ -105,11 +105,11 @@ const LOCALE_MAP = {
   },
 
 
-  "superimage": {
-    "label": "SuperImage 配置",
-    "n": { title: "生成数量", desc: "仅用于 grok-superimage-1.0 的服务端统一生成数量（1-10）。" },
-    "size": { title: "图片尺寸", desc: "仅用于 grok-superimage-1.0 的服务端统一尺寸。" },
-    "response_format": { title: "响应格式", desc: "仅用于 grok-superimage-1.0 的服务端统一返回格式。" }
+  "imagine_fast": {
+    "label": "Imagine Fast 配置",
+    "n": { title: "生成数量", desc: "仅用于 grok-imagine-1.0-fast 的服务端统一生成数量（1-10）。" },
+    "size": { title: "图片尺寸", desc: "仅用于 grok-imagine-1.0-fast 的服务端统一尺寸。" },
+    "response_format": { title: "响应格式", desc: "仅用于 grok-imagine-1.0-fast 的服务端统一返回格式。" }
   },
 
 
@@ -355,7 +355,7 @@ function renderConfig(data) {
 
       const header = document.createElement('div');
       header.innerHTML = `<div class="config-section-title">${getSectionLabel(section)}</div>`;
-      
+
       // 添加部分说明（如果有）
       if (SECTION_DESCRIPTIONS[section]) {
         const descP = document.createElement('p');
@@ -363,7 +363,7 @@ function renderConfig(data) {
         descP.textContent = SECTION_DESCRIPTIONS[section];
         header.appendChild(descP);
       }
-      
+
       card.appendChild(header);
 
       const grid = document.createElement('div');
@@ -425,7 +425,7 @@ function buildFieldCard(section, key, val) {
       { val: 'url', text: 'URL' }
     ]);
   }
-  else if (section === 'superimage' && key === 'size') {
+  else if (section === 'imagine_fast' && key === 'size') {
     built = buildSelectInput(section, key, val, [
       { val: '1024x1024', text: '1024x1024 (1:1)' },
       { val: '1280x720', text: '1280x720 (16:9)' },
@@ -434,7 +434,7 @@ function buildFieldCard(section, key, val) {
       { val: '1024x1792', text: '1024x1792 (2:3)' }
     ]);
   }
-  else if (section === 'superimage' && key === 'response_format') {
+  else if (section === 'imagine_fast' && key === 'response_format') {
     built = buildSelectInput(section, key, val, [
       { val: 'url', text: 'URL' },
       { val: 'b64_json', text: 'B64 JSON' },

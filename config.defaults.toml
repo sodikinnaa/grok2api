@@ -118,8 +118,8 @@ blocked_parallel_enabled = true
 
 
 # ==================== SuperImage 配置 ====================
-[superimage]
-# 仅对 grok-superimage-1.0 生效，由服务端统一控制，不使用客户端 image_config
+[imagine_fast]
+# 仅对 grok-imagine-1.0-fast 生效，由服务端统一控制，不使用客户端 image_config
 n = 1
 # 图片尺寸：1280x720 / 720x1280 / 1792x1024 / 1024x1792 / 1024x1024
 size = "1024x1024"

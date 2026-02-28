@@ -109,6 +109,7 @@ docker compose up -d
 | `grok-4.1-thinking` | 4 | Basic/Super | Yes | Yes | - |
 | `grok-4.20-beta` | 1 | Basic/Super | Yes | Yes | - |
 | `grok-imagine-1.0` | - | Basic/Super | - | Yes | - |
+| `grok-imagine-1.0-fast` | - | Basic/Super | - | Yes | - |
 | `grok-imagine-1.0-edit` | - | Basic/Super | - | Yes | - |
 | `grok-imagine-1.0-video` | - | Basic/Super | - | - | Yes |
 
@@ -151,7 +152,7 @@ curl http://localhost:8000/v1/chat/completions \
 | └─ `video_length` | integer | Video length (seconds) | `6`, `10`, `15` |
 | └─ `resolution_name` | string | Resolution | `480p`, `720p` |
 | └─ `preset` | string | Style preset | `fun`, `normal`, `spicy`, `custom` |
-| `image_config` | object | **Image models only** | Supported: `grok-imagine-1.0` / `grok-imagine-1.0-edit` |
+| `image_config` | object | **Image models only** | Supported: `grok-imagine-1.0` / `grok-imagine-1.0-fast` / `grok-imagine-1.0-edit` |
 | └─ `n` | integer | Number of images | `1` ~ `10` |
 | └─ `size` | string | Image size | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
 | └─ `response_format` | string | Response format | `url`, `b64_json`, `base64` |
@@ -177,6 +178,9 @@ curl http://localhost:8000/v1/chat/completions \
 - `image_url/input_audio/file` only supports URL or Data URI (`data:<mime>;base64,...`); raw base64 will be rejected.
 - `reasoning_effort`: `none` disables thinking output; any other value enables it.
 - Tool calling is **prompt-based + client-executed**: the model emits `<tool_call>{...}</tool_call>` and the server parses it into `tool_calls`; tools are not executed server-side.
+- `grok-imagine-1.0-fast` works similarly to the imagine waterfall stream, and can be called directly via `/v1/chat/completions`. Its `n/size/response_format` are globally controlled by the server's `[imagine_fast]` config.
+- `grok-imagine-1.0-fast` streaming output in `/chat/completions` only returns the final image, hiding intermediate preview images.
+- `grok-imagine-1.0-fast` streaming URL output will retain the original image filename (without appending `-final`).
 - `grok-imagine-1.0-edit` requires an image; if multiple are provided, the **last 3** images and last text are used.
 - `grok-imagine-1.0-video` supports text-to-video and image-to-video via `image_url` (**only the first image is used**).
 - Any other parameters will be discarded and ignored.
