@@ -14,6 +14,16 @@ from app.core.config import get_config
 
 
 def _default_ssl_context() -> ssl.SSLContext:
+    from app.core.config import get_config
+
+    skip_verify = bool(get_config("proxy.skip_proxy_ssl_verify")) and bool(
+        get_config("proxy.base_proxy_url")
+    )
+    if skip_verify:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        return context
     context = ssl.create_default_context()
     context.load_verify_locations(certifi.where())
     return context
