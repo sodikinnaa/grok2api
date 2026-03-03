@@ -51,7 +51,7 @@
 
   function setStatus(state, text) {
     if (!statusText) return;
-    statusText.textContent = text || '未连接';
+    statusText.textContent = text || t('common.notConnected');
     statusText.classList.remove('connected', 'connecting', 'error');
     if (state) {
       statusText.classList.add(state);
@@ -340,7 +340,7 @@
     rightWrap.className = 'meta-right';
     const status = document.createElement('span');
     status.className = 'image-status done';
-    status.textContent = '完成';
+    status.textContent = t('common.done');
     const right = document.createElement('span');
     if (meta && meta.elapsed_ms) {
       right.textContent = `${meta.elapsed_ms}ms`;
@@ -363,7 +363,7 @@
     if (isSelectionMode) {
       item.classList.add('selection-mode');
     }
-    
+
     if (reverseInsertToggle && reverseInsertToggle.checked) {
       waterfall.prepend(item);
     } else {
@@ -454,7 +454,7 @@
       rightWrap.className = 'meta-right';
       const status = document.createElement('span');
       status.className = `image-status ${isFinal ? 'done' : 'running'}`;
-      status.textContent = isFinal ? '完成' : '生成中';
+      status.textContent = isFinal ? t('common.done') : t('common.generating');
       const right = document.createElement('span');
       right.textContent = '';
       if (meta && meta.elapsed_ms) {
@@ -502,7 +502,7 @@
       }
     }
 
-    setImageStatus(item, isFinal ? 'done' : 'running', isFinal ? '完成' : '生成中');
+    setImageStatus(item, isFinal ? 'done' : 'running', isFinal ? t('common.done') : t('common.generating'));
     updateError('');
 
     if (isNew && autoScrollToggle && autoScrollToggle.checked) {
@@ -553,19 +553,19 @@
       appendImage(data.b64_json, data);
     } else if (data.type === 'status') {
       if (data.status === 'running') {
-        setStatus('connected', '生成中');
+        setStatus('connected', t('common.generating'));
         lastRunId = data.run_id || '';
       } else if (data.status === 'stopped') {
         if (data.run_id && lastRunId && data.run_id !== lastRunId) {
           return;
         }
-        setStatus('', '已停止');
+        setStatus('', t('common.stopped'));
       }
     } else if (data.type === 'error' || data.error) {
-      const message = data.message || (data.error && data.error.message) || '生成失败';
+      const message = data.message || (data.error && data.error.message) || t('common.generationFailed');
       const errorImageId = data.image_id || data.imageId;
       if (errorImageId && streamImageMap.has(errorImageId)) {
-        setImageStatus(streamImageMap.get(errorImageId), 'error', '失败');
+        setImageStatus(streamImageMap.get(errorImageId), 'error', t('common.failed'));
       }
       updateError(message);
       toast(message, 'error');
@@ -629,9 +629,9 @@
     stopAllConnections();
     updateModeValue();
 
-    setStatus('connected', '生成中 (SSE)');
+    setStatus('connected', t('imagine.generatingSSE'));
     setButtons(true);
-    toast(`已启动 ${taskIds.length} 个并发任务 (SSE)`, 'success');
+    toast(t('imagine.startedTasksSSE', { count: taskIds.length }), 'success');
 
     for (let i = 0; i < taskIds.length; i++) {
       const url = buildSseUrl(taskIds[i], i, rawPublicKey);
@@ -649,7 +649,7 @@
         updateActive();
         const remaining = sseConnections.filter(e => e && e.readyState === EventSource.OPEN).length;
         if (remaining === 0) {
-          setStatus('error', '连接错误');
+          setStatus('error', t('common.connectionError'));
           setButtons(false);
           isRunning = false;
           startBtn.disabled = false;
@@ -664,13 +664,13 @@
   async function startConnection() {
     const prompt = promptInput ? promptInput.value.trim() : '';
     if (!prompt) {
-      toast('请输入提示词', 'error');
+      toast(t('common.enterPrompt'), 'error');
       return;
     }
 
     const authHeader = await ensurePublicKey();
     if (authHeader === null) {
-      toast('请先配置 Public Key', 'error');
+      toast(t('common.configurePublicKey'), 'error');
       window.location.href = '/login';
       return;
     }
@@ -681,12 +681,12 @@
     const nsfwEnabled = nsfwSelect ? nsfwSelect.value === 'true' : true;
     
     if (isRunning) {
-      toast('已在运行中', 'warning');
+      toast(t('common.alreadyRunning'), 'warning');
       return;
     }
 
     isRunning = true;
-    setStatus('connecting', '连接中');
+    setStatus('connecting', t('common.connecting'));
     startBtn.disabled = true;
 
     if (pendingFallbackTimer) {
@@ -698,7 +698,7 @@
     try {
       taskIds = await createImagineTasks(prompt, ratio, concurrent, authHeader, nsfwEnabled);
     } catch (e) {
-      setStatus('error', '创建任务失败');
+      setStatus('error', t('common.createTaskFailed'));
       startBtn.disabled = false;
       isRunning = false;
       return;
@@ -742,9 +742,9 @@
         opened += 1;
         updateActive();
         if (i === 0) {
-          setStatus('connected', '生成中');
+          setStatus('connected', t('common.generating'));
           setButtons(true);
-          toast(`已启动 ${concurrent} 个并发任务`, 'success');
+          toast(t('imagine.startedTasks', { count: concurrent }), 'success');
         }
         sendStart(prompt, ws);
       };
@@ -760,7 +760,7 @@
         }
         const remaining = wsConnections.filter(w => w && w.readyState === WebSocket.OPEN).length;
         if (remaining === 0 && !fallbackDone) {
-          setStatus('', '未连接');
+          setStatus('', t('common.notConnected'));
           setButtons(false);
           isRunning = false;
           updateModeValue();
@@ -778,7 +778,7 @@
           return;
         }
         if (i === 0 && wsConnections.filter(w => w && w.readyState === WebSocket.OPEN).length === 0) {
-          setStatus('error', '连接错误');
+          setStatus('error', t('common.connectionError'));
           startBtn.disabled = false;
           isRunning = false;
           updateModeValue();
@@ -822,7 +822,7 @@
     updateActive();
     updateModeValue();
     setButtons(false);
-    setStatus('', '未连接');
+    setStatus('', t('common.notConnected'));
   }
 
   function clearImages() {
@@ -927,10 +927,10 @@
             folderPath.textContent = directoryHandle.name;
             selectFolderBtn.style.color = '#059669';
           }
-          toast('已选择文件夹: ' + directoryHandle.name, 'success');
+          toast(t('imagine.selectFolder', { name: directoryHandle.name }), 'success');
         } catch (e) {
           if (e.name !== 'AbortError') {
-            toast('选择文件夹失败', 'error');
+            toast(t('imagine.selectFolderFailed'), 'error');
           }
         }
       });
@@ -1032,7 +1032,7 @@
     if (toggleSelectAllBtn) {
       const items = document.querySelectorAll('.waterfall-item');
       const allSelected = items.length > 0 && selectedImages.size === items.length;
-      toggleSelectAllBtn.textContent = allSelected ? '取消全选' : '全选';
+      toggleSelectAllBtn.textContent = allSelected ? t('imagine.deselectAll') : t('imagine.selectAll');
     }
   }
   
@@ -1059,18 +1059,18 @@
   
   async function downloadSelectedImages() {
     if (selectedImages.size === 0) {
-      toast('请先选择要下载的图片', 'warning');
+      toast(t('imagine.noImagesSelected'), 'warning');
       return;
     }
     
     if (typeof JSZip === 'undefined') {
-      toast('JSZip 库加载失败，请刷新页面重试', 'error');
+      toast(t('imagine.jszipFailed'), 'error');
       return;
     }
     
-    toast(`正在打包 ${selectedImages.size} 张图片...`, 'info');
+    toast(t('imagine.packing', { count: selectedImages.size }), 'info');
     downloadSelectedBtn.disabled = true;
-    downloadSelectedBtn.textContent = '打包中...';
+    downloadSelectedBtn.textContent = t('imagine.packingBtn');
     
     const zip = new JSZip();
     const imgFolder = zip.folder('images');
@@ -1097,19 +1097,19 @@
           processed++;
           
           // Update progress
-          downloadSelectedBtn.innerHTML = `打包中... (${processed}/${selectedImages.size})`;
+          downloadSelectedBtn.innerHTML = t('imagine.packingProgress', { done: processed, total: selectedImages.size });
         } catch (error) {
           console.error('Failed to fetch image:', error);
         }
       }
       
       if (processed === 0) {
-        toast('没有成功获取任何图片', 'error');
+        toast(t('imagine.noImagesDownloaded'), 'error');
         return;
       }
       
       // Generate zip file
-      downloadSelectedBtn.textContent = '生成压缩包...';
+      downloadSelectedBtn.textContent = t('imagine.generatingZip');
       const content = await zip.generateAsync({ type: 'blob' });
       
       // Download zip
@@ -1119,14 +1119,14 @@
       link.click();
       URL.revokeObjectURL(link.href);
       
-      toast(`成功打包 ${processed} 张图片`, 'success');
+      toast(t('imagine.packSuccess', { count: processed }), 'success');
       exitSelectionMode();
     } catch (error) {
       console.error('Download failed:', error);
-      toast('打包失败，请重试', 'error');
+      toast(t('imagine.packFailed'), 'error');
     } finally {
     downloadSelectedBtn.disabled = false;
-    downloadSelectedBtn.innerHTML = `下载 <span id="selectedCount" class="selected-count">${selectedImages.size}</span>`;
+    downloadSelectedBtn.innerHTML = `${t('imagine.download')} <span id="selectedCount" class="selected-count">${selectedImages.size}</span>`;
     }
   }
   

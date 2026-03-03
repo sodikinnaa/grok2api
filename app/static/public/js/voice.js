@@ -102,8 +102,8 @@
       return true;
     }
     if (!initLiveKit()) {
-      log('错误: LiveKit SDK 未能正确加载，请刷新页面重试', 'error');
-      toast('LiveKit SDK 加载失败', 'error');
+      log(t('voice.livekitSDKError'), 'error');
+      toast(t('voice.livekitLoadFailed'), 'error');
       return false;
     }
     return true;
@@ -117,9 +117,9 @@
     }
     const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
     const secureHint = window.isSecureContext || isLocalhost
-      ? '请使用最新版浏览器并允许麦克风权限'
-      : '请使用 HTTPS 或在本机 localhost 访问';
-    throw new Error(`当前环境不支持麦克风权限，${secureHint}`);
+      ? t('voice.secureContextBrowser')
+      : t('voice.secureContextHTTPS');
+    throw new Error(t('voice.secureContextError', { hint: secureHint }));
   }
 
   async function startSession() {
@@ -130,15 +130,15 @@
     try {
       const authHeader = await ensurePublicKey();
       if (authHeader === null) {
-        toast('请先配置 Public Key', 'error');
+        toast(t('common.configurePublicKey'), 'error');
         window.location.href = '/login';
         return;
       }
 
       startBtn.disabled = true;
       updateMeta();
-      setStatus('connecting', '正在连接');
-      log('正在获取 Token...');
+      setStatus('connecting', t('voice.connectingStatus'));
+      log(t('voice.fetchingToken'));
 
       const params = new URLSearchParams({
         voice: voiceSelect.value,
@@ -153,21 +153,21 @@
       });
 
       if (!response.ok) {
-        throw new Error(`获取 Token 失败: ${response.status}`);
+        throw new Error(t('voice.fetchTokenFailed', { status: response.status }));
       }
 
       const { token, url } = await response.json();
-      log(`获取 Token 成功 (${voiceSelect.value}, ${personalitySelect.value}, ${speedRange.value}x)`);
+      log(`${t('voice.fetchTokenSuccess')} (${voiceSelect.value}, ${personalitySelect.value}, ${speedRange.value}x)`);
 
       room = new Room({
         adaptiveStream: true,
         dynacast: true
       });
 
-      room.on(RoomEvent.ParticipantConnected, (p) => log(`参与者已连接: ${p.identity}`));
-      room.on(RoomEvent.ParticipantDisconnected, (p) => log(`参与者已断开: ${p.identity}`));
+      room.on(RoomEvent.ParticipantConnected, (p) => log(t('voice.participantConnected', { identity: p.identity })));
+      room.on(RoomEvent.ParticipantDisconnected, (p) => log(t('voice.participantDisconnected', { identity: p.identity })));
       room.on(RoomEvent.TrackSubscribed, (track) => {
-        log(`订阅音轨: ${track.kind}`);
+        log(t('voice.trackSubscribed', { kind: track.kind }));
         if (track.kind === Track.Kind.Audio) {
           const element = track.attach();
           if (audioRoot) {
@@ -179,29 +179,29 @@
       });
 
       room.on(RoomEvent.Disconnected, () => {
-        log('已断开连接');
+        log(t('voice.disconnected'));
         resetUI();
       });
 
       await room.connect(url, token);
-      log('已连接到 LiveKit 服务器');
+      log(t('voice.connectedToServer'));
 
-      setStatus('connected', '通话中');
+      setStatus('connected', t('voice.inCall'));
       setButtons(true);
 
-      log('正在开启麦克风...');
+      log(t('voice.openingMic'));
       ensureMicSupport();
       const tracks = await createLocalTracks({ audio: true, video: false });
       for (const track of tracks) {
         await room.localParticipant.publishTrack(track);
       }
-      log('语音已开启');
-      toast('语音连接成功', 'success');
+      log(t('voice.voiceEnabled'));
+      toast(t('voice.voiceConnected'), 'success');
     } catch (err) {
-      const message = err && err.message ? err.message : '连接失败';
-      log(`错误: ${message}`, 'error');
+      const message = err && err.message ? err.message : t('common.connectionFailed');
+      log(t('voice.errorPrefix', { msg: message }), 'error');
       toast(message, 'error');
-      setStatus('error', '连接错误');
+      setStatus('error', t('common.connectionError'));
       startBtn.disabled = false;
     }
   }
@@ -214,7 +214,7 @@
   }
 
   function resetUI() {
-    setStatus('', '未连接');
+    setStatus('', t('common.notConnected'));
     setButtons(false);
     if (audioRoot) {
       audioRoot.innerHTML = '';
@@ -236,9 +236,9 @@
       .join('\n');
     try {
       await navigator.clipboard.writeText(lines);
-      toast('日志已复制', 'success');
+      toast(t('voice.logCopied'), 'success');
     } catch (err) {
-      toast('复制失败，请手动选择', 'error');
+      toast(t('voice.copyLogFailed'), 'error');
     }
   }
 
@@ -286,7 +286,7 @@
   window.addEventListener('resize', buildVisualizerBars);
   buildVisualizerBars();
   updateMeta();
-  setStatus('', '未连接');
+  setStatus('', t('common.notConnected'));
 
   if (!visualizerTimer) {
     visualizerTimer = setInterval(() => {

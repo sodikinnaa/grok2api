@@ -33,10 +33,10 @@ async function login() {
       }
       window.location.href = '/admin/token';
     } else {
-      showToast('密钥无效', 'error');
+      showToast(t('common.invalidKey'), 'error');
     }
   } catch (e) {
-    showToast('连接失败', 'error');
+    showToast(t('common.connectionFailed'), 'error');
   }
 }
 

@@ -20,6 +20,11 @@ async function loadAdminHeader() {
         }
       }
     });
+    if (window.I18n) {
+      I18n.applyToDOM(container);
+      var toggle = container.querySelector('#lang-toggle');
+      if (toggle) toggle.textContent = I18n.getLang() === 'zh' ? 'EN' : '中';
+    }
     if (typeof updateStorageModeButton === 'function') {
       updateStorageModeButton();
     }

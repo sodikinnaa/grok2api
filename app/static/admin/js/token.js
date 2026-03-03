@@ -65,7 +65,7 @@ async function readJsonResponse(res) {
   try {
     return JSON.parse(text);
   } catch (err) {
-    throw new Error(`响应不是有效 JSON (HTTP ${res.status})`);
+    throw new Error(t('token.notValidJson', { status: res.status }));
   }
 }
 
@@ -131,7 +131,7 @@ async function loadData() {
       throw new Error(`HTTP ${res.status}`);
     }
   } catch (e) {
-    showToast('加载失败: ' + e.message, 'error');
+    showToast(t('common.loadError', { msg: e.message }), 'error');
   }
 }
 
@@ -232,8 +232,8 @@ function renderTable() {
     tbody.replaceChildren();
     if (emptyState) {
       emptyState.textContent = currentFilter === 'all'
-        ? '暂无 Token，请点击右上角导入或添加。'
-        : '当前筛选无结果，请切换筛选条件。';
+        ? t('token.emptyState')
+        : t('token.emptyFilterState');
     }
     emptyState.classList.remove('hidden');
     updateSelectionState();
@@ -302,13 +302,13 @@ function renderTable() {
     tdActions.className = 'text-center';
     tdActions.innerHTML = `
                 <div class="flex items-center justify-center gap-2">
-                     <button onclick="refreshStatus('${item.token}')" class="p-1 text-gray-400 hover:text-black rounded" title="刷新状态">
+                     <button onclick="refreshStatus('${item.token}')" class="p-1 text-gray-400 hover:text-black rounded" title="${t('token.refreshStatus')}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                      </button>
-                     <button onclick="openEditModal(${originalIndex})" class="p-1 text-gray-400 hover:text-black rounded" title="编辑">
+                     <button onclick="openEditModal(${originalIndex})" class="p-1 text-gray-400 hover:text-black rounded" title="${t('common.edit')}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                      </button>
-                     <button onclick="deleteToken(${originalIndex})" class="p-1 text-gray-400 hover:text-red-600 rounded" title="删除">
+                     <button onclick="deleteToken(${originalIndex})" class="p-1 text-gray-400 hover:text-red-600 rounded" title="${t('common.delete')}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                      </button>
                 </div>
@@ -393,7 +393,7 @@ function addToken() {
 // Batch export (Selected only)
 function batchExport() {
   const selected = getSelectedTokens();
-  if (selected.length === 0) return showToast("未选择 Token", 'error');
+  if (selected.length === 0) return showToast(t('common.noTokenSelected'), 'error');
   const content = selected.map(t => t.token).join('\n') + '\n';
   downloadTextFile(content, `tokens_export_selected_${new Date().toISOString().slice(0, 10)}.txt`);
 }
@@ -416,7 +416,7 @@ function openEditModal(index) {
     byId('edit-pool').value = item.pool;
     byId('edit-quota').value = item.quota;
     byId('edit-note').value = item.note;
-    document.querySelector('#edit-modal h3').innerText = '编辑 Token';
+    document.querySelector('#edit-modal h3').innerText = t('token.editTitle');
   } else {
     // New Token
     const tokenInput = byId('edit-token-display');
@@ -430,7 +430,7 @@ function openEditModal(index) {
     byId('edit-pool').value = 'ssoBasic';
     byId('edit-quota').value = getDefaultQuotaForPool('ssoBasic');
     byId('edit-note').value = '';
-    document.querySelector('#edit-modal h3').innerText = '添加 Token';
+    document.querySelector('#edit-modal h3').innerText = t('token.addTitle');
   }
 
   openModal('edit-modal');
@@ -476,11 +476,11 @@ async function saveEdit() {
   } else {
     // Creating new
     token = byId('edit-token-display').value.trim();
-    if (!token) return showToast('Token 不能为空', 'error');
+    if (!token) return showToast(t('token.tokenEmpty'), 'error');
 
     // Check if exists
     if (flatTokens.some(t => t.token === token)) {
-      return showToast('Token 已存在', 'error');
+      return showToast(t('token.tokenExists'), 'error');
     }
 
     flatTokens.push({
@@ -502,7 +502,7 @@ async function saveEdit() {
 }
 
 async function deleteToken(index) {
-  const ok = await confirmAction('确定要删除此 Token 吗？', { okText: '删除' });
+  const ok = await confirmAction(t('token.confirmDelete'), { okText: t('common.delete') });
   if (!ok) return;
   flatTokens.splice(index, 1);
   syncToServer().then(loadData);
@@ -544,9 +544,9 @@ async function syncToServer() {
       },
       body: JSON.stringify(newTokens)
     });
-    if (!res.ok) showToast('保存失败', 'error');
+    if (!res.ok) showToast(t('common.saveFailed'), 'error');
   } catch (e) {
-    showToast('保存错误: ' + e.message, 'error');
+    showToast(t('common.saveError', { msg: e.message }), 'error');
   }
 }
 
@@ -592,7 +592,7 @@ async function submitImport() {
 
 // Export Logic
 function exportTokens() {
-  if (flatTokens.length === 0) return showToast("列表为空", 'error');
+  if (flatTokens.length === 0) return showToast(t('token.listEmpty'), 'error');
   const content = flatTokens.map(t => t.token).join('\n') + '\n';
   downloadTextFile(content, `tokens_export_${new Date().toISOString().slice(0, 10)}.txt`);
 }
@@ -638,28 +638,28 @@ async function refreshStatus(token) {
       loadData();
 
       if (isSuccess) {
-        showToast('刷新成功', 'success');
+        showToast(t('token.refreshSuccess'), 'success');
       } else {
-        showToast('刷新失败', 'error');
+        showToast(t('token.refreshFailed'), 'error');
       }
     } else {
-      showToast('刷新失败', 'error');
+      showToast(t('token.refreshFailed'), 'error');
     }
   } catch (e) {
     console.error(e);
-    showToast('请求错误', 'error');
+    showToast(t('token.requestError'), 'error');
   }
 }
 
 
 async function startBatchRefresh() {
   if (isBatchProcessing) {
-    showToast('当前有任务进行中', 'info');
+    showToast(t('common.taskInProgress'), 'info');
     return;
   }
 
   const selected = getSelectedTokens();
-  if (selected.length === 0) return showToast("未选择 Token", 'error');
+  if (selected.length === 0) return showToast(t('common.noTokenSelected'), 'error');
 
   // Init state
   isBatchProcessing = true;
@@ -683,7 +683,7 @@ async function startBatchRefresh() {
     });
     const data = await res.json();
     if (!res.ok || data.status !== 'success') {
-      throw new Error(data.detail || '请求失败');
+      throw new Error(data.detail || t('common.requestFailed'));
     }
 
     currentBatchTaskId = data.task_id;
@@ -700,22 +700,22 @@ async function startBatchRefresh() {
           updateBatchProgress();
           finishBatchProcess(false, { silent: true });
           if (msg.warning) {
-            showToast(`刷新完成\n⚠️ ${msg.warning}`, 'warning');
+            showToast(t('token.refreshDone') + '\n⚠️ ' + msg.warning, 'warning');
           } else {
-            showToast('刷新完成', 'success');
+            showToast(t('token.refreshDone'), 'success');
           }
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
         } else if (msg.type === 'cancelled') {
           finishBatchProcess(true, { silent: true });
-          showToast('已终止刷新', 'info');
+          showToast(t('token.stopRefresh'), 'info');
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
         } else if (msg.type === 'error') {
           finishBatchProcess(true, { silent: true });
-          showToast('刷新失败: ' + (msg.error || '未知错误'), 'error');
+          showToast(t('token.refreshError', { msg: msg.error || t('common.unknownError') }), 'error');
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
@@ -723,7 +723,7 @@ async function startBatchRefresh() {
       },
       onError: () => {
         finishBatchProcess(true, { silent: true });
-        showToast('连接中断', 'error');
+        showToast(t('common.connectionInterrupted'), 'error');
         currentBatchTaskId = null;
         BatchSSE.close(batchEventSource);
         batchEventSource = null;
@@ -731,14 +731,14 @@ async function startBatchRefresh() {
     });
   } catch (e) {
     finishBatchProcess(true, { silent: true });
-    showToast(e.message || '请求失败', 'error');
+    showToast(e.message || t('common.requestFailed'), 'error');
     currentBatchTaskId = null;
   }
 }
 
 function toggleBatchPause() {
   if (!isBatchProcessing) return;
-  showToast('当前任务不支持暂停', 'info');
+  showToast(t('common.taskNoPause'), 'info');
 }
 
 function stopBatchRefresh() {
@@ -767,19 +767,19 @@ function finishBatchProcess(aborted = false, options = {}) {
   if (options.silent) return;
   if (aborted) {
     if (action === 'delete') {
-      showToast('已终止删除', 'info');
+      showToast(t('token.stopDelete'), 'info');
     } else if (action === 'nsfw') {
-      showToast('已终止 NSFW', 'info');
+      showToast(t('token.stopNsfw'), 'info');
     } else {
-      showToast('已终止刷新', 'info');
+      showToast(t('token.stopRefresh'), 'info');
     }
   } else {
     if (action === 'delete') {
-      showToast('删除完成', 'success');
+      showToast(t('token.deleteDone'), 'success');
     } else if (action === 'nsfw') {
-      showToast('NSFW 开启完成', 'success');
+      showToast(t('token.nsfwDone'), 'success');
     } else {
-      showToast('刷新完成', 'success');
+      showToast(t('token.refreshDone'), 'success');
     }
   }
 }
@@ -827,12 +827,12 @@ function setActionButtonsState(selectedCount = null) {
 
 async function startBatchDelete() {
   if (isBatchProcessing) {
-    showToast('当前有任务进行中', 'info');
+    showToast(t('common.taskInProgress'), 'info');
     return;
   }
   const selected = getSelectedTokens();
-  if (selected.length === 0) return showToast("未选择 Token", 'error');
-  const ok = await confirmAction(`确定要删除选中的 ${selected.length} 个 Token 吗？`, { okText: '删除' });
+  if (selected.length === 0) return showToast(t('common.noTokenSelected'), 'error');
+  const ok = await confirmAction(t('token.confirmBatchDelete', { count: selected.length }), { okText: t('common.delete') });
   if (!ok) return;
 
   isBatchProcessing = true;
@@ -852,10 +852,10 @@ async function startBatchDelete() {
     batchProcessed = batchTotal;
     updateBatchProgress();
     finishBatchProcess(false, { silent: true });
-    showToast('删除完成', 'success');
+    showToast(t('token.deleteDone'), 'success');
   } catch (e) {
     finishBatchProcess(true, { silent: true });
-    showToast('删除失败', 'error');
+    showToast(t('common.deleteFailed'), 'error');
   }
 }
 
@@ -884,8 +884,8 @@ function confirmAction(message, options = {}) {
   const okBtn = byId('confirm-ok');
   const cancelBtn = byId('confirm-cancel');
   if (messageEl) messageEl.textContent = message;
-  if (okBtn) okBtn.textContent = options.okText || '确定';
-  if (cancelBtn) cancelBtn.textContent = options.cancelText || '取消';
+  if (okBtn) okBtn.textContent = options.okText || t('common.ok');
+  if (cancelBtn) cancelBtn.textContent = options.cancelText || t('common.cancel');
   return new Promise(resolve => {
     confirmResolver = resolve;
     dialog.classList.remove('hidden');
@@ -978,7 +978,7 @@ function updatePaginationControls(totalCount, totalPages) {
   }
 
   if (info) {
-    info.textContent = `第 ${totalCount === 0 ? 0 : currentPage} / ${totalPages} 页 · 共 ${totalCount} 条`;
+    info.textContent = t('token.pagination', { current: totalCount === 0 ? 0 : currentPage, total: totalPages, count: totalCount });
   }
   if (prevBtn) prevBtn.disabled = totalCount === 0 || currentPage <= 1;
   if (nextBtn) nextBtn.disabled = totalCount === 0 || currentPage >= totalPages;
@@ -1011,19 +1011,19 @@ function changePageSize() {
 
 async function batchEnableNSFW() {
   if (isBatchProcessing) {
-    showToast('当前有任务进行中', 'info');
+    showToast(t('common.taskInProgress'), 'info');
     return;
   }
 
   const selected = getSelectedTokens();
   const targetCount = selected.length;
   if (targetCount === 0) {
-    showToast('未选择 Token', 'error');
+    showToast(t('common.noTokenSelected'), 'error');
     return;
   }
-  const msg = `是否为选中的 ${targetCount} 个 Token 开启 NSFW 模式？`;
+  const msg = t('token.nsfwConfirm', { count: targetCount });
 
-  const ok = await confirmAction(msg, { okText: '开启 NSFW' });
+  const ok = await confirmAction(msg, { okText: t('token.nsfwEnable') });
   if (!ok) return;
 
   // 禁用按钮
@@ -1054,10 +1054,10 @@ async function batchEnableNSFW() {
       throw new Error(detail || `HTTP ${res.status}`);
     }
     if (!data) {
-      throw new Error(`空响应 (HTTP ${res.status})`);
+      throw new Error(t('token.emptyResponse', { status: res.status }));
     }
     if (data.status !== 'success') {
-      throw new Error(data.detail || '请求失败');
+      throw new Error(data.detail || t('common.requestFailed'));
     }
 
     currentBatchTaskId = data.task_id;
@@ -1076,7 +1076,7 @@ async function batchEnableNSFW() {
           const summary = msg.result && msg.result.summary ? msg.result.summary : null;
           const okCount = summary ? summary.ok : 0;
           const failCount = summary ? summary.fail : 0;
-          let text = `NSFW 开启完成：成功 ${okCount}，失败 ${failCount}`;
+          let text = t('token.nsfwResult', { ok: okCount, fail: failCount });
           if (msg.warning) text += `\n⚠️ ${msg.warning}`;
           showToast(text, failCount > 0 || msg.warning ? 'warning' : 'success');
           currentBatchTaskId = null;
@@ -1086,7 +1086,7 @@ async function batchEnableNSFW() {
           setActionButtonsState();
         } else if (msg.type === 'cancelled') {
           finishBatchProcess(true, { silent: true });
-          showToast('已终止 NSFW', 'info');
+          showToast(t('token.stopNsfw'), 'info');
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
@@ -1094,7 +1094,7 @@ async function batchEnableNSFW() {
           setActionButtonsState();
         } else if (msg.type === 'error') {
           finishBatchProcess(true, { silent: true });
-          showToast('开启失败: ' + (msg.error || '未知错误'), 'error');
+          showToast(t('token.nsfwFailed', { msg: msg.error || t('common.unknownError') }), 'error');
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
@@ -1104,7 +1104,7 @@ async function batchEnableNSFW() {
       },
       onError: () => {
         finishBatchProcess(true, { silent: true });
-        showToast('连接中断', 'error');
+        showToast(t('common.connectionInterrupted'), 'error');
         currentBatchTaskId = null;
         BatchSSE.close(batchEventSource);
         batchEventSource = null;
@@ -1114,7 +1114,7 @@ async function batchEnableNSFW() {
     });
   } catch (e) {
     finishBatchProcess(true, { silent: true });
-    showToast('请求错误: ' + e.message, 'error');
+    showToast(t('token.requestError') + ': ' + e.message, 'error');
     if (btn) btn.disabled = false;
     setActionButtonsState();
   }

@@ -17,6 +17,11 @@ async function loadPublicHeader() {
         // Ignore verification errors and keep it hidden
       }
     }
+    if (window.I18n) {
+      I18n.applyToDOM(container);
+      var toggle = container.querySelector('#lang-toggle');
+      if (toggle) toggle.textContent = I18n.getLang() === 'zh' ? 'EN' : '中';
+    }
     const path = window.location.pathname;
     const links = container.querySelectorAll('a[data-nav]');
     links.forEach((link) => {
