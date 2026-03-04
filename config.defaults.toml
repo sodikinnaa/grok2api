@@ -24,6 +24,8 @@ stream = true
 thinking = true
 # 是否动态生成 Statsig 指纹
 dynamic_statsig = true
+# 自定义指令
+custom_instruction = ""
 # 过滤的特殊标签列表
 filter_tags = ["xaiartifact","xai:tool_usage_card","grok:render"]
 
