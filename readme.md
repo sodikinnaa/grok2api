@@ -345,9 +345,11 @@ curl http://localhost:8000/v1/images/edits \
 |  | `stream` | 流式响应 | 是否默认启用流式输出。 | `true` |
 |  | `thinking` | 思维链 | 是否默认启用思维链输出。 | `true` |
 |  | `dynamic_statsig` | 动态指纹 | 是否动态生成 Statsig 指纹。 | `true` |
+|  | `custom_instruction` | 自定义指令 | 多行文本，透传为 Grok `customPersonality`。 | `""` |
 |  | `filter_tags` | 过滤标签 | 自动过滤 Grok 响应中的特殊标签。 | `["xaiartifact","xai:tool_usage_card","grok:render"]` |
 | **proxy** | `base_proxy_url` | 基础代理 URL | 代理请求到 Grok 官网的基础服务地址。 | `""` |
 |  | `asset_proxy_url` | 资源代理 URL | 代理请求到 Grok 官网的静态资源（图片/视频）地址。 | `""` |
+|  | `skip_proxy_ssl_verify` | 跳过代理 SSL 校验 | 代理使用自签名证书时启用（仅放行代理证书，目标站点仍校验）。 | `false` |
 |  | `enabled` | CF 自动刷新 | 是否启用 CF 自动刷新。 | `false` |
 |  | `flaresolverr_url` | FlareSolverr 地址 | FlareSolverr 服务的 HTTP 地址。 | `""` |
 |  | `refresh_interval` | 刷新间隔 | 自动刷新 cf_clearance 间隔（秒）。 | `3600` |
@@ -357,6 +359,7 @@ curl http://localhost:8000/v1/images/edits \
 |  | `user_agent` | User-Agent | HTTP 请求的 User-Agent 字符串。 | `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36` |
 | **retry** | `max_retry` | 最大重试 | 请求 Grok 服务失败时的最大重试次数。 | `3` |
 |  | `retry_status_codes` | 重试状态码 | 触发重试的 HTTP 状态码列表。 | `[401, 429, 403]` |
+|  | `reset_session_status_codes` | 重建状态码 | 触发重建 session 的 HTTP 状态码列表（用于轮换代理）。 | `[403]` |
 |  | `retry_backoff_base` | 退避基数 | 重试退避的基础延迟（秒）。 | `0.5` |
 |  | `retry_backoff_factor` | 退避倍率 | 重试退避的指数放大系数。 | `2.0` |
 |  | `retry_backoff_max` | 退避上限 | 单次重试等待的最大延迟（秒）。 | `20.0` |

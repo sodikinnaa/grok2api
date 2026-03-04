@@ -9,8 +9,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/geist@1.0.0/dist/fonts/geist-sans/style.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/geist@1.0.0/dist/fonts/geist-mono/style.css" rel="stylesheet">
-  <link href="/static/common/css/common.css?v=1.5.4" rel="stylesheet">
-  <link href="/static/admin/css/config.css?v=1.5.4" rel="stylesheet">
+  <link href="/static/common/css/common.css?v=1.5.5" rel="stylesheet">
+  <link href="/static/admin/css/config.css?v=1.5.5" rel="stylesheet">
   <link href="/static/common/css/toast.css" rel="stylesheet">
 </head>
 
@@ -21,9 +21,15 @@
   <main class="space-y-6 flex-1 container mx-auto max-w-5xl px-6 py-8 fade-in">
     <div class="space-y-6">
       <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-2xl font-semibold tracking-tight" data-i18n="config.title">配置管理</h2>
-          <p class="text-[var(--accents-4)] mt-1 text-sm" data-i18n="config.subtitle">管理 API 密钥及系统参数设置。</p>
+        <div class="flex items-start gap-3">
+          <button id="clean-unknown-btn" onclick="cleanUnknownFields()"
+            class="geist-button-outline text-xs px-3 hidden" data-i18n="config.cleanUnknown">
+            清理未知字段
+          </button>
+          <div>
+            <h2 class="text-2xl font-semibold tracking-tight" data-i18n="config.title">配置管理</h2>
+            <p class="text-[var(--accents-4)] mt-1 text-sm" data-i18n="config.subtitle">管理 API 密钥及系统参数设置。</p>
+          </div>
         </div>
         <button onclick="saveConfig()" id="save-btn" class="geist-button gap-2">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -47,11 +53,11 @@
   <div id="app-footer"></div>
 
   <script src="/static/i18n/i18n.js"></script>
-  <script src="/static/common/js/admin-auth.js?v=1.5.4"></script>
-  <script src="/static/common/js/header.js?v=1.5.4"></script>
-  <script src="/static/common/js/footer.js?v=1.5.4"></script>
+  <script src="/static/common/js/admin-auth.js?v=1.5.5"></script>
+  <script src="/static/common/js/header.js?v=1.5.5"></script>
+  <script src="/static/common/js/footer.js?v=1.5.5"></script>
   <script src="/static/common/js/toast.js"></script>
-  <script src="/static/admin/js/config.js?v=1.5.4"></script>
+  <script src="/static/admin/js/config.js?v=1.5.5"></script>
 </body>
 
 </html>

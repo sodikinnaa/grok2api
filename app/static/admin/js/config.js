@@ -59,6 +59,7 @@ const LOCALE_MAP = {
     "label": "代理配置",
     "base_proxy_url": { title: "基础代理 URL", desc: "代理请求到 Grok 官网的基础服务地址。" },
     "asset_proxy_url": { title: "资源代理 URL", desc: "代理请求到 Grok 官网的静态资源（图片/视频）地址。" },
+    "skip_proxy_ssl_verify": { title: "跳过代理 SSL 校验", desc: "代理使用自签名证书时启用（仅放行代理证书校验）。" },
     "enabled": { title: "启用 CF 自动刷新", desc: "启用后将通过 FlareSolverr 自动获取 cf_clearance。" },
     "flaresolverr_url": { title: "FlareSolverr 地址", desc: "FlareSolverr 服务的 HTTP 地址（如 http://flaresolverr:8191）。" },
     "refresh_interval": { title: "刷新间隔（秒）", desc: "自动刷新 cf_clearance 的时间间隔，建议不低于 300 秒。" },
@@ -73,6 +74,7 @@ const LOCALE_MAP = {
     "label": "重试策略",
     "max_retry": { title: "最大重试次数", desc: "请求 Grok 服务失败时的最大重试次数。" },
     "retry_status_codes": { title: "重试状态码", desc: "触发重试的 HTTP 状态码列表。" },
+    "reset_session_status_codes": { title: "重建状态码", desc: "触发重建 session 的 HTTP 状态码列表（用于轮换代理）。" },
     "retry_backoff_base": { title: "退避基数", desc: "重试退避的基础延迟（秒）。" },
     "retry_backoff_factor": { title: "退避倍率", desc: "重试退避的指数放大系数。" },
     "retry_backoff_max": { title: "退避上限", desc: "单次重试等待的最大延迟（秒）。" },
@@ -204,6 +206,46 @@ function getSectionLabel(section) {
   var label = t('config.sections.' + section);
   if (label.indexOf('config.sections.') !== 0) return label;
   return (LOCALE_MAP[section] && LOCALE_MAP[section].label) || t('config.sectionFallback', { section: section });
+}
+
+function isKnownField(section, key) {
+  if (LOCALE_MAP[section] && LOCALE_MAP[section][key]) return true;
+  var tTitle = t('config.fields.' + section + '.' + key + '.title');
+  return tTitle.indexOf('config.fields.') !== 0;
+}
+
+function collectUnknownFields(data) {
+  const out = [];
+  Object.entries(data || {}).forEach(([section, items]) => {
+    if (!items || typeof items !== 'object' || Array.isArray(items)) return;
+    Object.keys(items).forEach((key) => {
+      if (!isKnownField(section, key)) {
+        out.push({ section, key });
+      }
+    });
+  });
+  return out;
+}
+
+function dropUnknownFields(data) {
+  const unknown = collectUnknownFields(data);
+  unknown.forEach(({ section, key }) => {
+    if (data[section]) {
+      delete data[section][key];
+      if (Object.keys(data[section]).length === 0) {
+        delete data[section];
+      }
+    }
+  });
+  return unknown.length;
+}
+
+function updateUnknownFieldsButton(data) {
+  const btn = byId('clean-unknown-btn');
+  if (!btn) return;
+  const unknown = collectUnknownFields(data);
+  btn.classList.toggle('hidden', unknown.length === 0);
+  btn.dataset.unknownCount = String(unknown.length);
 }
 
 function sortByOrder(keys, orderMap) {
@@ -414,6 +456,7 @@ function renderConfig(data) {
   // 初始化 CF 自动刷新联动状态
   const cfEnabled = data.proxy && data.proxy.enabled;
   applyCfRefreshState(cfEnabled);
+  updateUnknownFieldsButton(data);
 }
 
 function applyCfRefreshState(enabled) {
@@ -545,7 +588,7 @@ function buildFieldCard(section, key, val) {
   return fieldCard;
 }
 
-async function saveConfig() {
+async function saveConfig(options = {}) {
   const btn = byId('save-btn');
   const originalText = btn.innerText;
   btn.disabled = true;
@@ -578,6 +621,16 @@ async function saveConfig() {
       newConfig[s][k] = val;
     });
 
+    if (options.dropUnknown) {
+      const removed = dropUnknownFields(newConfig);
+      if (!removed) {
+        showToast(t('config.noUnknownFields'), 'info');
+        btn.disabled = false;
+        btn.innerText = originalText;
+        return;
+      }
+    }
+
     if (newConfig.proxy && newConfig.proxy.enabled) {
       const url = String(newConfig.proxy.flaresolverr_url || '').trim();
       if (!url) {
@@ -598,8 +651,14 @@ async function saveConfig() {
     });
 
     if (res.ok) {
+      currentConfig = newConfig;
+      updateUnknownFieldsButton(currentConfig);
       btn.innerText = t('config.saved');
-      showToast(t('config.configSaved'), 'success');
+      if (options.dropUnknown) {
+        showToast(t('config.cleanedUnknownFields'), 'success');
+      } else {
+        showToast(t('config.configSaved'), 'success');
+      }
       setTimeout(() => {
         btn.innerText = originalText;
         btn.style.backgroundColor = '';
@@ -617,6 +676,20 @@ async function saveConfig() {
       btn.disabled = false;
     }
   }
+}
+
+async function cleanUnknownFields() {
+  const unknown = collectUnknownFields(currentConfig);
+  if (!unknown.length) {
+    showToast(t('config.noUnknownFields'), 'info');
+    updateUnknownFieldsButton(currentConfig);
+    return;
+  }
+  const ok = window.confirm(
+    t('config.cleanUnknownConfirm', { count: unknown.length })
+  );
+  if (!ok) return;
+  await saveConfig({ dropUnknown: true });
 }
 
 async function copyToClipboard(text, btn) {

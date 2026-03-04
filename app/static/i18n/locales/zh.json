@@ -106,6 +106,10 @@
     "flaresolverrRequired": "启用自动刷新时必须填写 FlareSolverr 地址",
     "generate": "生成",
     "publicAccess": "功能玩法",
+    "cleanUnknown": "清理未知字段",
+    "cleanUnknownConfirm": "发现 {count} 个未知字段，确认清理？",
+    "noUnknownFields": "未发现未知字段",
+    "cleanedUnknownFields": "已清理未知字段",
     "noDesc": "暂无说明，请参考配置文档。",
     "sectionFallback": "{section} 设置",
     "sections": {

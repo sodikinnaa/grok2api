@@ -165,13 +165,16 @@ class AppChatReverse:
                 tool_overrides=tool_overrides,
                 model_config_override=model_config_override,
             )
-            try:
-                payload_log = orjson.dumps(payload).decode("utf-8")
-            except Exception:
-                payload_log = str(payload)
-            logger.info(
-                "AppChatReverse final Grok params (最终组装的 Grok 参数)",
-                extra={"grok_payload": payload_log},
+            payload_summary = {
+                "model": payload.get("modelName"),
+                "mode": payload.get("modelMode"),
+                "message_len": payload.get("message") or "",
+                "file_attachments": len(payload.get("fileAttachments") or []),
+                "custom_personality_len": len(payload.get("customPersonality") or ""),
+            }
+            logger.debug(
+                "AppChatReverse final Grok params (redacted)",
+                extra={"grok_payload": payload_summary},
             )
 
             # Curl Config
