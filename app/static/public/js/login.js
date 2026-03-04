@@ -22,10 +22,10 @@ async function login() {
       await storePublicKey(input);
       window.location.href = '/chat';
     } else {
-      showToast('密钥无效', 'error');
+      showToast(t('common.invalidKey'), 'error');
     }
   } catch (e) {
-    showToast('连接失败', 'error');
+    showToast(t('common.connectionFailed'), 'error');
   }
 }
 

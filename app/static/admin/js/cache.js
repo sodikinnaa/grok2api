@@ -63,15 +63,15 @@ function setText(el, text) {
 
 function resolveOnlineStatus(status) {
   if (status === 'ok') {
-    return { text: '连接正常', className: 'text-xs text-green-600 mt-1' };
+    return { text: t('common.connected'), className: 'text-xs text-green-600 mt-1' };
   }
   if (status === 'no_token') {
-    return { text: '无可用 Token', className: 'text-xs text-orange-500 mt-1' };
+    return { text: t('cache.noTokenAvailable'), className: 'text-xs text-orange-500 mt-1' };
   }
   if (status === 'not_loaded') {
-    return { text: '未加载', className: 'text-xs text-[var(--accents-4)] mt-1' };
+    return { text: t('cache.notLoaded'), className: 'text-xs text-[var(--accents-4)] mt-1' };
   }
-  return { text: '无法连接', className: 'text-xs text-red-500 mt-1' };
+  return { text: t('cache.cannotConnect'), className: 'text-xs text-red-500 mt-1' };
 }
 
 function createIconButton(title, svg, onClick) {
@@ -183,8 +183,8 @@ function confirmAction(message, options = {}) {
     return Promise.resolve(window.confirm(message));
   }
   if (ui.confirmMessage) ui.confirmMessage.textContent = message;
-  if (ui.confirmOk) ui.confirmOk.textContent = options.okText || '确定';
-  if (ui.confirmCancel) ui.confirmCancel.textContent = options.cancelText || '取消';
+  if (ui.confirmOk) ui.confirmOk.textContent = options.okText || t('common.ok');
+  if (ui.confirmCancel) ui.confirmCancel.textContent = options.cancelText || t('common.cancel');
   return new Promise(resolve => {
     confirmResolver = resolve;
     dialog.showModal();
@@ -246,7 +246,7 @@ async function loadStats(options = {}) {
     applyStatsData(data, merge);
     return data;
   } catch (e) {
-    if (!silent) showToast('加载统计失败', 'error');
+    if (!silent) showToast(t('cache.loadStatsFailed'), 'error');
     return null;
   }
 }
@@ -299,7 +299,7 @@ function applyStatsData(data, merge = false) {
   }
 
   const timeText = formatTime(online.last_asset_clear_at);
-  setText(ui.onlineLastClear, timeText ? `上次清空：${timeText}` : '');
+  setText(ui.onlineLastClear, timeText ? t('cache.lastClear', { time: timeText }) : '');
 
   renderAccountTable(data);
 }
@@ -409,7 +409,7 @@ function renderAccountTable(data) {
     tdCount.className = 'text-center';
     const countBadge = document.createElement('span');
     countBadge.className = 'badge badge-gray';
-    countBadge.textContent = row.count === '-' ? '未加载' : row.count;
+    countBadge.textContent = row.count === '-' ? t('cache.notLoaded') : row.count;
     tdCount.appendChild(countBadge);
 
     const tdLast = document.createElement('td');
@@ -421,7 +421,7 @@ function renderAccountTable(data) {
     const actionsWrap = document.createElement('div');
     actionsWrap.className = 'flex items-center justify-center gap-2';
     actionsWrap.appendChild(createIconButton(
-      '清空',
+      t('cache.clear'),
       `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
       () => clearOnlineCache(row.token)
     ));
@@ -442,7 +442,7 @@ function renderAccountTable(data) {
 }
 
 async function clearCache(type) {
-  const ok = await confirmAction(`确定要清空本地${type === 'image' ? '图片' : '视频'}缓存吗？`, { okText: '清空' });
+  const ok = await confirmAction(t(type === 'image' ? 'cache.confirmClearImage' : 'cache.confirmClearVideo'), { okText: t('cache.clear') });
   if (!ok) return;
 
   try {
@@ -457,7 +457,7 @@ async function clearCache(type) {
 
     const data = await res.json();
     if (data.status === 'success') {
-      showToast(`清理成功，释放 ${data.result.size_mb} MB`, 'success');
+      showToast(t('cache.clearSuccess', { size: data.result.size_mb }), 'success');
       const state = cacheListState[type];
       if (state) {
         state.items = [];
@@ -472,10 +472,10 @@ async function clearCache(type) {
       }
       loadStats();
     } else {
-      showToast('清理失败', 'error');
+      showToast(t('cache.clearFailed'), 'error');
     }
   } catch (e) {
-    showToast('请求失败', 'error');
+    showToast(t('common.requestFailed'), 'error');
   }
 }
 
@@ -598,10 +598,10 @@ function updateLoadButton() {
   const btn = ui.loadBtn;
   if (!btn) return;
   if (currentSection === 'online') {
-    btn.textContent = '加载';
+    btn.textContent = t('common.load');
     btn.title = '';
   } else {
-    btn.textContent = '刷新';
+    btn.textContent = t('common.refresh');
     btn.title = '';
   }
 }
@@ -610,10 +610,10 @@ function updateDeleteButton() {
   const btn = ui.deleteBtn;
   if (!btn) return;
   if (currentSection === 'online') {
-    btn.textContent = '清理';
+    btn.textContent = t('cache.clean');
     btn.title = '';
   } else {
-    btn.textContent = '删除';
+    btn.textContent = t('common.delete');
     btn.title = '';
   }
 }
@@ -767,14 +767,14 @@ async function toggleCacheList(type) {
 async function loadLocalCacheList(type) {
   const body = type === 'image' ? ui.localImageBody : ui.localVideoBody;
   if (!body) return;
-  body.innerHTML = `<tr><td colspan="5">加载中...</td></tr>`;
+  body.innerHTML = `<tr><td colspan="5">${t('common.loading')}</td></tr>`;
   try {
     const params = new URLSearchParams({ type, page: '1', page_size: '1000' });
     const res = await fetch(`/v1/admin/cache/list?${params.toString()}`, {
       headers: buildAuthHeaders(apiKey)
     });
     if (!res.ok) {
-      body.innerHTML = `<tr><td colspan="5">加载失败</td></tr>`;
+      body.innerHTML = `<tr><td colspan="5">${t('common.loadFailed')}</td></tr>`;
       return;
     }
     const data = await res.json();
@@ -788,7 +788,7 @@ async function loadLocalCacheList(type) {
     });
     renderLocalCacheList(type, items);
   } catch (e) {
-    body.innerHTML = `<tr><td colspan="5">加载失败</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5">${t('common.loadFailed')}</td></tr>`;
   }
 }
 
@@ -796,7 +796,7 @@ function renderLocalCacheList(type, items) {
   const body = type === 'image' ? ui.localImageBody : ui.localVideoBody;
   if (!body) return;
   if (!items || items.length === 0) {
-    body.innerHTML = `<tr><td colspan="5" class="table-empty">暂无文件</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="table-empty">${t('cache.noFiles')}</td></tr>`;
     syncLocalSelectAllState(type);
     return;
   }
@@ -846,13 +846,13 @@ function renderLocalCacheList(type, items) {
     tdActions.className = 'text-center';
     tdActions.innerHTML = `
       <div class="cache-list-actions">
-        <button class="cache-icon-button" onclick="viewLocalFile('${type}', '${item.name}')" title="查看">
+        <button class="cache-icon-button" onclick="viewLocalFile('${type}', '${item.name}')" title="${t('common.view')}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path>
             <circle cx="12" cy="12" r="3"></circle>
           </svg>
         </button>
-        <button class="cache-icon-button" onclick="deleteLocalFile('${type}', '${item.name}')" title="删除">
+        <button class="cache-icon-button" onclick="deleteLocalFile('${type}', '${item.name}')" title="${t('common.delete')}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -880,11 +880,11 @@ function viewLocalFile(type, name) {
 }
 
 async function deleteLocalFile(type, name) {
-  const ok = await confirmAction(`确定要删除该文件吗？`, { okText: '删除' });
+  const ok = await confirmAction(t('cache.confirmDeleteFile'), { okText: t('common.delete') });
   if (!ok) return;
   const okDelete = await requestDeleteLocalFile(type, name);
   if (!okDelete) return;
-  showToast('删除成功', 'success');
+  showToast(t('common.deleteSuccess'), 'success');
   const state = cacheListState[type];
   if (state && Array.isArray(state.items)) {
     state.items = state.items.filter(item => item.name !== name);
@@ -915,10 +915,10 @@ async function deleteSelectedLocal(type) {
   const selected = selectedLocal[type];
   const names = selected ? Array.from(selected) : [];
   if (names.length === 0) {
-    showToast('未选择文件', 'info');
+    showToast(t('cache.noFilesSelected'), 'info');
     return;
   }
-  const ok = await confirmAction(`确定要删除选中的 ${names.length} 个文件吗？`, { okText: '删除' });
+  const ok = await confirmAction(t('cache.confirmBatchDeleteFiles', { count: names.length }), { okText: t('common.delete') });
   if (!ok) return;
   isLocalDeleting = true;
   setActionButtonsState();
@@ -948,16 +948,16 @@ async function deleteSelectedLocal(type) {
   isLocalDeleting = false;
   setActionButtonsState();
   if (failed === 0) {
-    showToast(`已删除 ${success} 个文件`, 'success');
+    showToast(t('cache.deletedFiles', { count: success }), 'success');
   } else {
-    showToast(`删除完成：成功 ${success}，失败 ${failed}`, 'info');
+    showToast(t('cache.deleteResult', { success: success, failed: failed }), 'info');
   }
 }
 
 function handleLoadClick() {
   ensureUI();
   if (isBatchLoading || isBatchDeleting) {
-    showToast('当前有任务进行中', 'info');
+    showToast(t('common.taskInProgress'), 'info');
     return;
   }
   if (currentSection === 'online') {
@@ -970,7 +970,7 @@ function handleLoadClick() {
 function handleDeleteClick() {
   ensureUI();
   if (isBatchLoading || isBatchDeleting) {
-    showToast('当前有任务进行中', 'info');
+    showToast(t('common.taskInProgress'), 'info');
     return;
   }
   if (currentSection === 'online') {
@@ -989,10 +989,10 @@ function stopBatchLoad(options = {}) {
   BatchSSE.close(batchEventSource);
   batchEventSource = null;
   currentBatchTaskId = null;
-  setOnlineStatus('已终止', 'text-xs text-[var(--accents-4)] mt-1');
+  setOnlineStatus(t('common.terminated'), 'text-xs text-[var(--accents-4)] mt-1');
   updateLoadButton();
   refreshBatchUI();
-  if (!options.silent) showToast('已终止剩余加载请求', 'info');
+  if (!options.silent) showToast(t('cache.stoppedLoadRequests'), 'info');
 }
 
 function stopBatchDelete(options = {}) {
@@ -1006,12 +1006,12 @@ function stopBatchDelete(options = {}) {
   currentBatchTaskId = null;
   updateDeleteButton();
   refreshBatchUI();
-  if (!options.silent) showToast('已终止剩余清理请求', 'info');
+  if (!options.silent) showToast(t('cache.stoppedCleanRequests'), 'info');
 }
 
 function togglePause() {
   if (isBatchLoading || isBatchDeleting) {
-    showToast('当前批量任务不支持暂停', 'info');
+    showToast(t('common.batchNoPause'), 'info');
   }
 }
 
@@ -1063,7 +1063,7 @@ function retryFailed() {
   const tokens = Array.from(failures.keys());
   if (tokens.length === 0) return;
   if (isBatchLoading || isBatchDeleting) {
-    showToast('请等待当前任务结束', 'info');
+    showToast(t('common.waitTaskFinish'), 'info');
     return;
   }
   if (ui.failureDialog) ui.failureDialog.close();
@@ -1076,11 +1076,11 @@ function retryFailed() {
 
 async function startBatchLoad(tokens) {
   if (isBatchLoading) {
-    showToast('正在加载中，请稍候', 'info');
+    showToast(t('common.loadingInProgress'), 'info');
     return;
   }
   if (isBatchDeleting) {
-    showToast('正在清理中，请稍候', 'info');
+    showToast(t('common.cleaningInProgress'), 'info');
     return;
   }
   if (!tokens || tokens.length === 0) return;
@@ -1096,7 +1096,7 @@ async function startBatchLoad(tokens) {
 
   batchTokens.forEach(token => accountStates.delete(token));
   updateOnlineCountFromTokens(batchTokens);
-  setOnlineStatus('加载中', 'text-xs text-blue-600 mt-1');
+  setOnlineStatus(t('cache.loadingStatus'), 'text-xs text-blue-600 mt-1');
   updateLoadButton();
   if (accountMap.size > 0) {
     renderAccountTable({ online_accounts: Array.from(accountMap.values()), online_details: [], online: {} });
@@ -1114,7 +1114,7 @@ async function startBatchLoad(tokens) {
     });
     const data = await res.json();
     if (!res.ok || data.status !== 'success') {
-      throw new Error(data.detail || '请求失败');
+      throw new Error(data.detail || t('common.requestFailed'));
     }
 
     currentBatchTaskId = data.task_id;
@@ -1140,20 +1140,20 @@ async function startBatchLoad(tokens) {
           }
           finishBatchLoad();
           if (msg.warning) {
-            showToast(`加载完成\n⚠️ ${msg.warning}`, 'warning');
+            showToast(t('cache.loadDone') + '\n⚠️ ' + msg.warning, 'warning');
           }
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
         } else if (msg.type === 'cancelled') {
           stopBatchLoad({ silent: true });
-          showToast('已终止加载', 'info');
+          showToast(t('cache.loadStopped'), 'info');
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
         } else if (msg.type === 'error') {
           stopBatchLoad({ silent: true });
-          showToast('加载失败: ' + (msg.error || '未知错误'), 'error');
+          showToast(t('cache.loadFailedMsg', { msg: msg.error || t('common.unknownError') }), 'error');
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
@@ -1161,7 +1161,7 @@ async function startBatchLoad(tokens) {
       },
       onError: () => {
         stopBatchLoad({ silent: true });
-        showToast('连接中断', 'error');
+        showToast(t('common.connectionInterrupted'), 'error');
         currentBatchTaskId = null;
         BatchSSE.close(batchEventSource);
         batchEventSource = null;
@@ -1169,7 +1169,7 @@ async function startBatchLoad(tokens) {
     });
   } catch (e) {
     stopBatchLoad({ silent: true });
-    showToast(e.message || '请求失败', 'error');
+    showToast(e.message || t('common.requestFailed'), 'error');
   }
 }
 
@@ -1183,11 +1183,11 @@ function finishBatchLoad() {
     return !state || (state.status && state.status !== 'ok');
   });
   if (batchTokens.length === 0) {
-    setOnlineStatus('未加载', 'text-xs text-[var(--accents-4)] mt-1');
+    setOnlineStatus(t('cache.notLoaded'), 'text-xs text-[var(--accents-4)] mt-1');
   } else if (hasError) {
-    setOnlineStatus('部分异常', 'text-xs text-orange-500 mt-1');
+    setOnlineStatus(t('common.partialError'), 'text-xs text-orange-500 mt-1');
   } else {
-    setOnlineStatus('连接正常', 'text-xs text-green-600 mt-1');
+    setOnlineStatus(t('common.connected'), 'text-xs text-green-600 mt-1');
   }
   updateLoadButton();
   refreshBatchUI();
@@ -1195,7 +1195,7 @@ function finishBatchLoad() {
 
 async function loadSelectedAccounts() {
   if (selectedTokens.size === 0) {
-    showToast('请选择要加载的账号', 'error');
+    showToast(t('cache.selectAccountsToLoad'), 'error');
     return;
   }
   startBatchLoad(Array.from(selectedTokens));
@@ -1204,7 +1204,7 @@ async function loadSelectedAccounts() {
 async function loadAllAccounts() {
   const tokens = Array.from(accountMap.keys());
   if (tokens.length === 0) {
-    showToast('暂无可用账号', 'error');
+    showToast(t('cache.noAccounts'), 'error');
     return;
   }
   startBatchLoad(tokens);
@@ -1212,18 +1212,18 @@ async function loadAllAccounts() {
 
 async function clearSelectedAccounts() {
   if (selectedTokens.size === 0) {
-    showToast('请选择要清空的账号', 'error');
+    showToast(t('cache.selectAccountsToClear'), 'error');
     return;
   }
   if (isBatchDeleting) {
-    showToast('正在清理中，请稍候', 'info');
+    showToast(t('common.cleaningInProgress'), 'info');
     return;
   }
   if (isBatchLoading) {
-    showToast('正在加载中，请稍候', 'info');
+    showToast(t('common.loadingInProgress'), 'info');
     return;
   }
-  const ok = await confirmAction(`确定要清空选中的 ${selectedTokens.size} 个账号在线资产吗？`, { okText: '清空' });
+  const ok = await confirmAction(t('cache.confirmClearAccounts', { count: selectedTokens.size }), { okText: t('cache.clear') });
   if (!ok) return;
   startBatchDelete(Array.from(selectedTokens));
 }
@@ -1238,7 +1238,7 @@ async function startBatchDelete(tokens) {
   deleteTotal = tokens.length;
   deleteProcessed = 0;
   batchQueue = tokens.slice();
-  showToast('正在批量清理在线资产，请稍候...', 'info');
+  showToast(t('cache.batchCleanInProgress'), 'info');
   updateDeleteButton();
   refreshBatchUI();
   try {
@@ -1252,7 +1252,7 @@ async function startBatchDelete(tokens) {
     });
     const data = await res.json();
     if (!res.ok || data.status !== 'success') {
-      throw new Error(data.detail || '请求失败');
+      throw new Error(data.detail || t('common.requestFailed'));
     }
 
     currentBatchTaskId = data.task_id;
@@ -1272,26 +1272,26 @@ async function startBatchDelete(tokens) {
           if (result && result.results) {
             Object.entries(result.results).forEach(([token, res]) => {
               if (res.status !== 'success') {
-                deleteFailed.set(token, res.error || '清理失败');
+                deleteFailed.set(token, res.error || t('cache.cleanFailedEntry'));
               }
             });
           }
           finishBatchDelete();
           if (msg.warning) {
-            showToast(`清理完成\n⚠️ ${msg.warning}`, 'warning');
+            showToast(t('cache.batchCleanDone') + '\n⚠️ ' + msg.warning, 'warning');
           }
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
         } else if (msg.type === 'cancelled') {
           stopBatchDelete({ silent: true });
-          showToast('已终止清理', 'info');
+          showToast(t('cache.cleanStopped'), 'info');
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
         } else if (msg.type === 'error') {
           stopBatchDelete({ silent: true });
-          showToast('清理失败: ' + (msg.error || '未知错误'), 'error');
+          showToast(t('cache.cleanFailedMsg', { msg: msg.error || t('common.unknownError') }), 'error');
           currentBatchTaskId = null;
           BatchSSE.close(batchEventSource);
           batchEventSource = null;
@@ -1299,7 +1299,7 @@ async function startBatchDelete(tokens) {
       },
       onError: () => {
         stopBatchDelete({ silent: true });
-        showToast('连接中断', 'error');
+        showToast(t('common.connectionInterrupted'), 'error');
         currentBatchTaskId = null;
         BatchSSE.close(batchEventSource);
         batchEventSource = null;
@@ -1307,7 +1307,7 @@ async function startBatchDelete(tokens) {
     });
   } catch (e) {
     stopBatchDelete({ silent: true });
-    showToast(e.message || '请求失败', 'error');
+    showToast(e.message || t('common.requestFailed'), 'error');
   }
 }
 
@@ -1317,24 +1317,24 @@ function finishBatchDelete() {
   currentBatchAction = null;
   updateDeleteButton();
   refreshBatchUI();
-  showToast('批量清理完成', 'success');
+  showToast(t('cache.batchCleanDone'), 'success');
   loadStats();
 }
 
 async function clearOnlineCache(targetToken = '', skipConfirm = false) {
   const tokenToClear = targetToken || (currentScope === 'all' ? '' : currentToken);
   if (!tokenToClear) {
-    showToast('请选择要清空的账号', 'error');
+    showToast(t('cache.selectAccountsToClear'), 'error');
     return;
   }
   const meta = accountMap.get(tokenToClear);
   const label = meta ? meta.token_masked : tokenToClear;
   if (!skipConfirm) {
-    const ok = await confirmAction(`确定要清空账号 ${label} 的在线资产吗？`, { okText: '清空' });
+    const ok = await confirmAction(t('cache.confirmClearAccount', { label: label }), { okText: t('cache.clear') });
     if (!ok) return;
   }
 
-  showToast('正在清理在线资产，请稍候...', 'info');
+  showToast(t('cache.cleanInProgress'), 'info');
 
   try {
     const res = await fetch('/v1/admin/cache/online/clear', {
@@ -1348,12 +1348,12 @@ async function clearOnlineCache(targetToken = '', skipConfirm = false) {
 
     const data = await res.json();
     if (data.status === 'success') {
-      showToast(`清理完成 (成功: ${data.result.success}, 失败: ${data.result.failed})`, 'success');
+      showToast(t('cache.cleanResult', { success: data.result.success, failed: data.result.failed }), 'success');
     } else {
-      showToast('清理失败', 'error');
+      showToast(t('cache.clearFailed'), 'error');
     }
   } catch (e) {
-    showToast('请求超时或失败', 'error');
+    showToast(t('cache.requestTimeout'), 'error');
   }
 }
 

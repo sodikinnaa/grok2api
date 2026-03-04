@@ -110,7 +110,7 @@
       previewCount = 0;
     }
     if (durationValue) {
-      durationValue.textContent = '耗时 -';
+      durationValue.textContent = t('video.elapsedTimeNone');
     }
   }
 
@@ -127,7 +127,7 @@
 
     const title = document.createElement('div');
     title.className = 'video-item-title';
-    title.textContent = `视频 ${previewCount}`;
+    title.textContent = t('video.videoTitle', { n: previewCount });
 
     const actions = document.createElement('div');
     actions.className = 'video-item-actions';
@@ -136,12 +136,12 @@
     openBtn.className = 'geist-button-outline text-xs px-3 video-open hidden';
     openBtn.target = '_blank';
     openBtn.rel = 'noopener';
-    openBtn.textContent = '打开';
+    openBtn.textContent = t('video.open');
 
     const downloadBtn = document.createElement('button');
     downloadBtn.className = 'geist-button-outline text-xs px-3 video-download';
     downloadBtn.type = 'button';
-    downloadBtn.textContent = '下载';
+    downloadBtn.textContent = t('imagine.download');
     downloadBtn.disabled = true;
 
     actions.appendChild(openBtn);
@@ -151,7 +151,7 @@
 
     const body = document.createElement('div');
     body.className = 'video-item-body';
-    body.innerHTML = '<div class="video-item-placeholder">生成中…</div>';
+    body.innerHTML = '<div class="video-item-placeholder">' + t('video.generatingPlaceholder') + '</div>';
 
     const link = document.createElement('div');
     link.className = 'video-item-link';
@@ -217,7 +217,7 @@
     elapsedTimer = setInterval(() => {
       if (!startAt) return;
       const seconds = Math.max(0, Math.round((Date.now() - startAt) / 1000));
-      durationValue.textContent = `耗时 ${seconds}s`;
+      durationValue.textContent = t('video.elapsedTime', { sec: seconds });
     }, 1000);
   }
 
@@ -234,7 +234,7 @@
       imageFileInput.value = '';
     }
     if (imageFileName) {
-      imageFileName.textContent = '未选择文件';
+      imageFileName.textContent = t('common.noFileSelected');
     }
   }
 
@@ -262,7 +262,7 @@
     const prompt = promptInput ? promptInput.value.trim() : '';
     const rawUrl = imageUrlInput ? imageUrlInput.value.trim() : '';
     if (fileDataUrl && rawUrl) {
-      toast('参考图只能选择其一：URL/Base64 或 本地上传', 'error');
+      toast(t('video.referenceConflict'), 'error');
       throw new Error('invalid_reference');
     }
     const imageUrl = fileDataUrl || rawUrl;
@@ -365,11 +365,11 @@
     if (text.includes('<think>') || text.includes('</think>')) {
       return;
     }
-    if (text.includes('超分辨率')) {
-      setStatus('connecting', '超分辨率中');
+    if (text.includes('超分辨率') || text.includes('super resolution')) {
+      setStatus('connecting', t('video.superResolutionInProgress'));
       setIndeterminate(true);
       if (progressText) {
-        progressText.textContent = '超分辨率中';
+        progressText.textContent = t('video.superResolutionInProgress');
       }
       return;
     }
@@ -419,18 +419,18 @@
   async function startConnection() {
     const prompt = promptInput ? promptInput.value.trim() : '';
     if (!prompt) {
-      toast('请输入提示词', 'error');
+      toast(t('common.enterPrompt'), 'error');
       return;
     }
 
     if (isRunning) {
-      toast('已在生成中', 'warning');
+      toast(t('video.alreadyGenerating'), 'warning');
       return;
     }
 
     const authHeader = await ensurePublicKey();
     if (authHeader === null) {
-      toast('请先配置 Public Key', 'error');
+      toast(t('common.configurePublicKey'), 'error');
       window.location.href = '/login';
       return;
     }
@@ -440,13 +440,13 @@
     updateMeta();
     resetOutput(true);
     initPreviewSlot();
-    setStatus('connecting', '连接中');
+    setStatus('connecting', t('common.connecting'));
 
     let taskId = '';
     try {
       taskId = await createVideoTask(authHeader);
     } catch (e) {
-      setStatus('error', '创建任务失败');
+      setStatus('error', t('common.createTaskFailed'));
       startBtn.disabled = false;
       isRunning = false;
       return;
@@ -454,7 +454,7 @@
 
     currentTaskId = taskId;
     startAt = Date.now();
-    setStatus('connected', '生成中');
+    setStatus('connected', t('common.generating'));
     setButtons(true);
     setIndeterminate(true);
     startElapsedTimer();
@@ -466,7 +466,7 @@
     currentSource = es;
 
     es.onopen = () => {
-      setStatus('connected', '生成中');
+      setStatus('connected', t('common.generating'));
     };
 
     es.onmessage = (event) => {
@@ -483,7 +483,7 @@
       }
       if (payload && payload.error) {
         toast(payload.error, 'error');
-        setStatus('error', '生成失败');
+        setStatus('error', t('common.generationFailed'));
         finishRun(true);
         return;
       }
@@ -499,7 +499,7 @@
 
     es.onerror = () => {
       if (!isRunning) return;
-      setStatus('error', '连接错误');
+      setStatus('error', t('common.connectionError'));
       finishRun(true);
     };
   }
@@ -514,7 +514,7 @@
     currentTaskId = '';
     stopElapsedTimer();
     setButtons(false);
-    setStatus('', '未连接');
+    setStatus('', t('common.notConnected'));
   }
 
   function finishRun(hasError) {
@@ -524,13 +524,13 @@
     setButtons(false);
     stopElapsedTimer();
     if (!hasError) {
-      setStatus('connected', '完成');
+      setStatus('connected', t('common.done'));
       setIndeterminate(false);
       updateProgress(100);
     }
     if (durationValue && startAt) {
       const seconds = Math.max(0, Math.round((Date.now() - startAt) / 1000));
-      durationValue.textContent = `耗时 ${seconds}s`;
+      durationValue.textContent = t('video.elapsedTime', { sec: seconds });
     }
   }
 
@@ -572,7 +572,7 @@
         anchor.remove();
         URL.revokeObjectURL(blobUrl);
       } catch (e) {
-        toast('下载失败，请检查视频链接是否可访问', 'error');
+        toast(t('video.downloadFailed'), 'error');
       }
     });
   }
@@ -596,12 +596,12 @@
           fileDataUrl = reader.result;
         } else {
           fileDataUrl = '';
-          toast('文件读取失败', 'error');
+          toast(t('common.fileReadFailed'), 'error');
         }
       };
       reader.onerror = () => {
         fileDataUrl = '';
-        toast('文件读取失败', 'error');
+        toast(t('common.fileReadFailed'), 'error');
       };
       reader.readAsDataURL(file);
     });

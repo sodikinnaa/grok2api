@@ -262,12 +262,12 @@ async function updateStorageModeButton() {
   const btn = document.getElementById('storage-mode-btn');
   if (!btn) return;
   btn.textContent = '...';
-  btn.title = '存储模式';
+  btn.title = typeof t === 'function' ? t('nav.storageMode') : '存储模式';
   btn.classList.remove('storage-ready');
   const storageType = await fetchStorageType();
   const label = formatStorageLabel(storageType);
   btn.textContent = label === '-' ? label : label.toUpperCase();
-  btn.title = '存储模式';
+  btn.title = typeof t === 'function' ? t('nav.storageMode') : '存储模式';
   if (label !== '-') {
     btn.classList.add('storage-ready');
   }

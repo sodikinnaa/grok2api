@@ -40,11 +40,16 @@
   let activeStreamInfo = null;
   const feedbackUrl = 'https://github.com/chenyme/grok2api/issues/new';
   const CHAT_COMPLETIONS_ENDPOINT = '/v1/public/chat/completions';
+  const DEFAULT_SESSION_TITLES = ['新会话', 'New Session'];
 
   let sessionsData = null;
 
   function generateId() {
     return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+
+  function isDefaultTitleValue(title) {
+    return DEFAULT_SESSION_TITLES.includes(title);
   }
 
   function loadSessions() {
@@ -65,7 +70,8 @@
         activeId: id,
         sessions: [{
           id,
-          title: '新会话',
+          title: t('chat.newSession'),
+          isDefaultTitle: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
           messages: []
@@ -73,6 +79,11 @@
       };
       saveSessions();
     }
+    sessionsData.sessions.forEach((session) => {
+      if (session && typeof session.isDefaultTitle === 'undefined') {
+        session.isDefaultTitle = isDefaultTitleValue(session.title);
+      }
+    });
     if (!sessionsData.activeId || !sessionsData.sessions.find(s => s.id === sessionsData.activeId)) {
       sessionsData.activeId = sessionsData.sessions[0].id;
     }
@@ -97,12 +108,12 @@
         }
       }
       const name = msg.attachmentName || '';
-      const fileLabel = hasFile ? (name ? `[文件] ${name}` : '[文件]') : '';
+      const fileLabel = hasFile ? (name ? t('chat.fileLabel') + ' ' + name : t('chat.fileLabel')) : '';
       if (textParts.length && fileLabel) return `${textParts.join('\n')}\n${fileLabel}`;
       if (textParts.length) return textParts.join('\n');
-      return fileLabel || '[复合内容]';
+      return fileLabel || t('chat.compositeContent');
     }
-    return '[复合内容]';
+    return t('chat.compositeContent');
   }
 
   function serializeMessage(msg) {
@@ -136,7 +147,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
     } catch (e) {
-      toast('本地存储空间不足，部分会话未保存', 'error');
+      toast(t('chat.storageFull'), 'error');
     }
   }
 
@@ -197,7 +208,8 @@
     const id = generateId();
     const session = {
       id,
-      title: '新会话',
+      title: t('chat.newSession'),
+      isDefaultTitle: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       messages: []
@@ -252,7 +264,7 @@
 
   function updateSessionTitle(session) {
     if (!session) return;
-    if (session.title && session.title !== '新会话') return;
+    if (session.isDefaultTitle === false) return;
     const firstUser = session.messages.find(m => m.role === 'user');
     if (!firstUser) return;
     const text = getMessageDisplay(firstUser);
@@ -260,6 +272,7 @@
     const title = text.replace(/\n/g, ' ').trim().slice(0, 20);
     if (title) {
       session.title = title;
+      session.isDefaultTitle = false;
     }
   }
 
@@ -267,7 +280,8 @@
     const session = sessionsData.sessions.find(s => s.id === id);
     if (!session) return;
     const trimmed = (newTitle || '').trim();
-    session.title = trimmed || '新会话';
+    session.title = trimmed || t('chat.newSession');
+    session.isDefaultTitle = !trimmed && isDefaultTitleValue(session.title);
     session.updatedAt = Date.now();
     saveSessions();
     renderSessionList();
@@ -290,7 +304,7 @@
     input.addEventListener('blur', commit);
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-      if (e.key === 'Escape') { input.value = session.title || '新会话'; input.blur(); }
+      if (e.key === 'Escape') { input.value = session.title || t('chat.newSession'); input.blur(); }
     });
   }
 
@@ -318,7 +332,7 @@
 
       const titleSpan = document.createElement('span');
       titleSpan.className = 'session-title';
-      titleSpan.textContent = session.title || '新会话';
+      titleSpan.textContent = session.title || t('chat.newSession');
       titleSpan.addEventListener('dblclick', (e) => {
         e.stopPropagation();
         startRenameSession(session.id, titleSpan);
@@ -334,7 +348,7 @@
       const delBtn = document.createElement('button');
       delBtn.className = 'session-delete';
       delBtn.type = 'button';
-      delBtn.title = '删除';
+      delBtn.title = t('common.delete');
       delBtn.textContent = '×';
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -402,7 +416,7 @@
 
   function setStatus(state, text) {
     if (!statusText) return;
-    statusText.textContent = text || '就绪';
+    statusText.textContent = text || t('chat.ready');
     statusText.classList.remove('connected', 'connecting', 'error');
     if (state) statusText.classList.add(state);
   }
@@ -772,11 +786,11 @@
   }
 
   const toolTypeMap = {
-    websearch: { icon: '', label: '\u7F51\u9875\u641C\u7D22' },
-    searchimage: { icon: '', label: '\u56FE\u7247\u641C\u7D22' },
-    agentthink: { icon: '', label: '\u601D\u8003\u63A8\u7406' }
+    websearch: { icon: '', label: t('chat.toolWebSearch') },
+    searchimage: { icon: '', label: t('chat.toolImageSearch') },
+    agentthink: { icon: '', label: t('chat.toolAgentThink') }
   };
-  const defaultToolType = { icon: '', label: '\u5DE5\u5177' };
+  const defaultToolType = { icon: '', label: t('chat.toolDefault') };
 
   function getToolMeta(typeStr) {
     const key = String(typeStr || '').trim().toLowerCase().replace(/\s+/g, '');
@@ -809,7 +823,7 @@
           const meta = getToolMeta(item.type);
           const iconHtml = meta.icon ? `<span class="think-tool-icon">${meta.icon}</span>` : '';
           const typeLabel = `${iconHtml}${escapeHtml(meta.label)}`;
-          return `<div class="think-item-row think-tool-card" data-tool-type="${typeAttr}"><div class="think-item-type" data-type="${typeAttr}">${typeLabel}</div><div class="think-item-body">${body || '<em>\uFF08\u7A7A\uFF09</em>'}</div></div>`;
+          return `<div class="think-item-row think-tool-card" data-tool-type="${typeAttr}"><div class="think-item-type" data-type="${typeAttr}">${typeLabel}</div><div class="think-item-body">${body || '<em>' + t('chat.empty') + '</em>'}</div></div>`;
         }).join('');
         const title = escapeHtml(group.id);
         const openAttr = openAllGroups ? ' open' : '';
@@ -839,7 +853,7 @@
       if (part.type === 'think') {
         const body = renderThinkContent(part.value.trim(), part.open);
         const openAttr = part.open ? ' open' : '';
-        return `<details class="think-block" data-think="true"${openAttr}><summary class="think-summary">思考</summary><div class="think-content">${body || '<em>（空）</em>'}</div></details>`;
+        return `<details class="think-block" data-think="true"${openAttr}><summary class="think-summary">${t('chat.thinkLabel')}</summary><div class="think-content">${body || '<em>' + t('chat.empty') + '</em>'}</div></details>`;
       }
       return renderBasicMarkdown(part.value);
     }).join('');
@@ -871,7 +885,7 @@
     if (idx === -1 || idx >= messageHistory.length) return;
     const msg = messageHistory[idx];
     if (msg && (msg.hasAttachment || typeof msg.content !== 'string')) {
-      toast('附件消息暂不支持编辑', 'error');
+      toast(t('chat.attachmentNoEdit'), 'error');
       return;
     }
     const currentText = typeof msg.content === 'string' ? msg.content : '';
@@ -886,8 +900,8 @@
 
     const btnWrap = document.createElement('div');
     btnWrap.className = 'edit-msg-actions';
-    const saveBtn = createActionButton('保存', '保存编辑', () => commit());
-    const cancelBtn = createActionButton('取消', '取消编辑', () => cancel());
+    const saveBtn = createActionButton(t('chat.saveEdit'), t('chat.saveEditTitle'), () => commit());
+    const cancelBtn = createActionButton(t('chat.cancelEdit'), t('chat.cancelEditTitle'), () => cancel());
     btnWrap.appendChild(saveBtn);
     btnWrap.appendChild(cancelBtn);
 
@@ -911,7 +925,7 @@
     function commit() {
       const newText = textarea.value.trim();
       if (!newText) {
-        toast('内容不能为空', 'error');
+        toast(t('chat.contentEmpty'), 'error');
         return;
       }
       msg.content = newText;
@@ -965,7 +979,7 @@
     const sendSessionId = sessionsData.activeId;
     const assistantEntry = createMessage('assistant', '');
     setSendingState(true);
-    setStatus('connecting', '发送中');
+    setStatus('connecting', t('common.sending'));
 
     abortController = new AbortController();
     const payload = buildPayload();
@@ -984,21 +998,21 @@
           body: JSON.stringify(payload),
           signal: abortController.signal
         });
-        if (!res.ok) throw new Error(`请求失败: ${res.status}`);
+        if (!res.ok) throw new Error(t('chat.requestFailedStatus', { status: res.status }));
         await handleStream(res, assistantEntry, sendSessionId);
-        setStatus('connected', '完成');
+        setStatus('connected', t('common.done'));
       } catch (e) {
         if (e && e.name === 'AbortError') {
-          updateMessage(assistantEntry, assistantEntry.raw || '已停止', true);
-          setStatus('error', '已停止');
+          updateMessage(assistantEntry, assistantEntry.raw || t('common.stopped'), true);
+          setStatus('error', t('common.stopped'));
           if (!assistantEntry.committed) {
             assistantEntry.committed = true;
             commitToSession(sendSessionId, assistantEntry.raw || '');
           }
         } else {
-          updateMessage(assistantEntry, `请求失败: ${e.message || e}`, true);
-          setStatus('error', '失败');
-          toast('请求失败，请检查服务状态', 'error');
+          updateMessage(assistantEntry, t('chat.requestFailedStatus', { status: e.message || e }), true);
+          setStatus('error', t('common.failed'));
+          toast(t('chat.requestFailedCheck'), 'error');
         }
       } finally {
         setSendingState(false);
@@ -1041,9 +1055,9 @@
       const actions = document.createElement('div');
       actions.className = 'message-actions';
       if (editable) {
-        actions.appendChild(createActionButton('编辑', '编辑消息内容', () => editMessageByRow(row)));
+        actions.appendChild(createActionButton(t('chat.editMessage'), t('chat.editMessageTitle'), () => editMessageByRow(row)));
       }
-      actions.appendChild(createActionButton('重新生成', '从此处重新生成回复', () => regenerateFromRow(row)));
+      actions.appendChild(createActionButton(t('chat.regenerate'), t('chat.regenerateTitle'), () => regenerateFromRow(row)));
       row.appendChild(actions);
     }
     return entry;
@@ -1228,7 +1242,7 @@
         const wrapper = document.createElement('button');
         wrapper.type = 'button';
         wrapper.className = 'img-retry';
-        wrapper.textContent = '点击重试';
+        wrapper.textContent = t('chat.clickRetry');
         wrapper.addEventListener('click', () => {
           wrapper.classList.add('loading');
           const original = img.getAttribute('src') || '';
@@ -1250,7 +1264,7 @@
     if (!entry || !entry.contentNode) return;
     const summaries = entry.contentNode.querySelectorAll('.think-summary');
     if (!summaries.length) return;
-    const text = typeof elapsedSec === 'number' ? (elapsedSec > 0 ? `思考 ${elapsedSec} 秒` : '已思考') : '思考中';
+    const text = typeof elapsedSec === 'number' ? (elapsedSec > 0 ? t('chat.thinkingSec', { sec: elapsedSec }) : t('chat.thought')) : t('chat.thinking');
     summaries.forEach((node) => {
       node.textContent = text;
       const block = node.closest('.think-block');
@@ -1385,7 +1399,7 @@
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error('文件读取失败'));
+      reader.onerror = () => reject(new Error(t('common.fileReadFailed')));
       reader.readAsDataURL(file);
     });
   }
@@ -1400,7 +1414,7 @@
       };
       showAttachmentBadge();
     } catch (e) {
-      toast('文件读取失败', 'error');
+      toast(t('common.fileReadFailed'), 'error');
     }
   }
 
@@ -1419,10 +1433,10 @@
     const actions = document.createElement('div');
     actions.className = 'message-actions';
 
-    const retryBtn = createActionButton('重试', '重试上一条回答', () => retryLast());
-    const editBtn = createActionButton('编辑', '编辑回答内容', () => editMessageByRow(entry.row));
-    const copyBtn = createActionButton('复制', '复制回答内容', () => copyToClipboard(entry.raw || ''));
-    const feedbackBtn = createActionButton('反馈', '反馈到 Grok2API', () => {
+    const retryBtn = createActionButton(t('common.retry'), t('chat.retryTitle'), () => retryLast());
+    const editBtn = createActionButton(t('chat.editAnswer'), t('chat.editAnswerTitle'), () => editMessageByRow(entry.row));
+    const copyBtn = createActionButton(t('chat.copyAnswer'), t('chat.copyAnswerTitle'), () => copyToClipboard(entry.raw || ''));
+    const feedbackBtn = createActionButton(t('chat.feedback'), t('chat.feedbackTitle'), () => {
       window.open(feedbackUrl, '_blank', 'noopener');
     });
 
@@ -1435,7 +1449,7 @@
 
   async function copyToClipboard(text) {
     if (!text) {
-      toast('暂无内容可复制', 'error');
+      toast(t('chat.noContentToCopy'), 'error');
       return;
     }
     try {
@@ -1451,9 +1465,9 @@
         document.execCommand('copy');
         document.body.removeChild(temp);
       }
-      toast('已复制', 'success');
+      toast(t('common.copied'), 'success');
     } catch (e) {
-      toast('复制失败', 'error');
+      toast(t('common.copyFailed'), 'error');
     }
   }
 
@@ -1468,14 +1482,14 @@
       }
     }
     if (lastUserIndex === -1) {
-      toast('没有可重试的对话', 'error');
+      toast(t('chat.noChatToRetry'), 'error');
       return;
     }
     const historySlice = messageHistory.slice(0, lastUserIndex + 1);
     const retrySessionId = sessionsData.activeId;
     const assistantEntry = createMessage('assistant', '');
     setSendingState(true);
-    setStatus('connecting', '发送中');
+    setStatus('connecting', t('common.sending'));
 
     abortController = new AbortController();
     const payload = buildPayloadFrom(historySlice);
@@ -1497,15 +1511,15 @@
       });
 
       if (!res.ok) {
-        throw new Error(`请求失败: ${res.status}`);
+        throw new Error(t('chat.requestFailedStatus', { status: res.status }));
       }
 
       await handleStream(res, assistantEntry, retrySessionId);
-      setStatus('connected', '完成');
+      setStatus('connected', t('common.done'));
     } catch (e) {
-      updateMessage(assistantEntry, `请求失败: ${e.message || e}`, true);
-      setStatus('error', '失败');
-      toast('请求失败，请检查服务状态', 'error');
+      updateMessage(assistantEntry, t('chat.requestFailedStatus', { status: e.message || e }), true);
+      setStatus('error', t('common.failed'));
+      toast(t('chat.requestFailedCheck'), 'error');
     } finally {
       setSendingState(false);
       abortController = null;
@@ -1517,13 +1531,13 @@
     if (isSending) return;
     const prompt = promptInput ? promptInput.value.trim() : '';
     if (!prompt && !attachment) {
-      toast('请输入内容', 'error');
+      toast(t('common.enterContent'), 'error');
       return;
     }
 
     let displayText = prompt || '';
     if (attachment) {
-      const label = `[文件] ${attachment.name}`;
+      const label = t('chat.fileLabel') + ' ' + attachment.name;
       displayText = displayText ? `${displayText}\n${label}` : label;
     }
 
@@ -1558,7 +1572,7 @@
     const sendSessionId = sessionsData.activeId;
     const assistantEntry = createMessage('assistant', '');
     setSendingState(true);
-    setStatus('connecting', '发送中');
+    setStatus('connecting', t('common.sending'));
 
     abortController = new AbortController();
     const payload = buildPayload();
@@ -1580,27 +1594,27 @@
       });
 
       if (!res.ok) {
-        throw new Error(`请求失败: ${res.status}`);
+        throw new Error(t('chat.requestFailedStatus', { status: res.status }));
       }
 
       await handleStream(res, assistantEntry, sendSessionId);
-      setStatus('connected', '完成');
+      setStatus('connected', t('common.done'));
     } catch (e) {
       if (e && e.name === 'AbortError') {
-        updateMessage(assistantEntry, assistantEntry.raw || '已停止', true);
+        updateMessage(assistantEntry, assistantEntry.raw || t('common.stopped'), true);
         if (assistantEntry.hasThink) {
           const elapsed = assistantEntry.thinkElapsed || Math.max(1, Math.round((Date.now() - assistantEntry.startedAt) / 1000));
           updateThinkSummary(assistantEntry, elapsed);
         }
-        setStatus('error', '已停止');
+        setStatus('error', t('common.stopped'));
         if (!assistantEntry.committed) {
           assistantEntry.committed = true;
           commitToSession(sendSessionId, assistantEntry.raw || '');
         }
       } else {
-        updateMessage(assistantEntry, `请求失败: ${e.message || e}`, true);
-        setStatus('error', '失败');
-        toast('请求失败，请检查服务状态', 'error');
+        updateMessage(assistantEntry, t('chat.requestFailedStatus', { status: e.message || e }), true);
+        setStatus('error', t('common.failed'));
+        toast(t('chat.requestFailedCheck'), 'error');
       }
     } finally {
       setSendingState(false);

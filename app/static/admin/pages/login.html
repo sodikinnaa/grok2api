@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Grok2API - 登录</title>
+  <title data-i18n="login.adminPageTitle">Grok2API - 登录</title>
   <link rel="icon" href="/static/common/img/favicon/favicon.ico">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/geist@1.0.0/dist/fonts/geist-sans/style.css" rel="stylesheet">
@@ -43,18 +43,19 @@
           <span>Grok2API</span>
         </a>
       </div>
-      <div class="login-title">管理后台</div>
-      <div class="login-subtitle">请输入后台密码以继续</div>
+      <div class="login-title" data-i18n="login.adminTitle">管理后台</div>
+      <div class="login-subtitle" data-i18n="login.adminSubtitle">请输入后台密码以继续</div>
 
       <div class="login-form">
-        <input type="password" id="api-key-input" placeholder="后台密码 (app_key)" class="geist-input login-input">
-        <button onclick="login()" class="geist-button login-button">继续</button>
+        <input type="password" id="api-key-input" placeholder="后台密码 (app_key)" data-i18n-placeholder="login.adminPlaceholder" class="geist-input login-input">
+        <button onclick="login()" class="geist-button login-button" data-i18n="login.continue">继续</button>
       </div>
     </div>
   </div>
 
   <div id="app-footer"></div>
 
+  <script src="/static/i18n/i18n.js"></script>
   <script src="/static/common/js/admin-auth.js?v=1.5.4"></script>
   <script src="/static/common/js/toast.js"></script>
   <script src="/static/common/js/footer.js?v=1.5.4"></script>
