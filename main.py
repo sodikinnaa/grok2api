@@ -156,8 +156,16 @@ def create_app() -> FastAPI:
     app.include_router(admin_router, prefix="/v1/admin")
     app.include_router(public_router, prefix="/v1/public")
     app.include_router(pages_router)
+    
+    # 健康检查接口（用于 Render、服务器保活检测等）
+    @app.get("/health")
+    def health():
+        """
+        健康检查接口，用于服务器保活或 Render 自动检测
+        """
+        return {"status": "ok"}
 
-    return app
+    return app    
 
 
 app = create_app()
