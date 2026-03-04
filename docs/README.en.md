@@ -360,6 +360,7 @@ Config file: `data/config.toml`
 |  | `filter_tags` | Filter tags | Filter special tags in responses. | `["xaiartifact","xai:tool_usage_card","grok:render"]` |
 | **proxy** | `base_proxy_url` | Base proxy URL | Proxy to Grok web. | `""` |
 |  | `asset_proxy_url` | Asset proxy URL | Proxy to Grok assets (img/video). | `""` |
+|  | `cf_cookies` | CF cookies | Full cookie string written by FlareSolverr refresh. | `""` |
 |  | `skip_proxy_ssl_verify` | Skip proxy SSL verify | Enable when proxy uses a self-signed cert (proxy only; upstream TLS is still verified). | `false` |
 |  | `enabled` | CF auto refresh | Enable Cloudflare auto refresh. | `false` |
 |  | `flaresolverr_url` | FlareSolverr URL | FlareSolverr HTTP endpoint. | `""` |

@@ -208,46 +208,6 @@ function getSectionLabel(section) {
   return (LOCALE_MAP[section] && LOCALE_MAP[section].label) || t('config.sectionFallback', { section: section });
 }
 
-function isKnownField(section, key) {
-  if (LOCALE_MAP[section] && LOCALE_MAP[section][key]) return true;
-  var tTitle = t('config.fields.' + section + '.' + key + '.title');
-  return tTitle.indexOf('config.fields.') !== 0;
-}
-
-function collectUnknownFields(data) {
-  const out = [];
-  Object.entries(data || {}).forEach(([section, items]) => {
-    if (!items || typeof items !== 'object' || Array.isArray(items)) return;
-    Object.keys(items).forEach((key) => {
-      if (!isKnownField(section, key)) {
-        out.push({ section, key });
-      }
-    });
-  });
-  return out;
-}
-
-function dropUnknownFields(data) {
-  const unknown = collectUnknownFields(data);
-  unknown.forEach(({ section, key }) => {
-    if (data[section]) {
-      delete data[section][key];
-      if (Object.keys(data[section]).length === 0) {
-        delete data[section];
-      }
-    }
-  });
-  return unknown.length;
-}
-
-function updateUnknownFieldsButton(data) {
-  const btn = byId('clean-unknown-btn');
-  if (!btn) return;
-  const unknown = collectUnknownFields(data);
-  btn.classList.toggle('hidden', unknown.length === 0);
-  btn.dataset.unknownCount = String(unknown.length);
-}
-
 function sortByOrder(keys, orderMap) {
   if (!orderMap) return keys;
   return keys.sort((a, b) => {
@@ -456,7 +416,6 @@ function renderConfig(data) {
   // 初始化 CF 自动刷新联动状态
   const cfEnabled = data.proxy && data.proxy.enabled;
   applyCfRefreshState(cfEnabled);
-  updateUnknownFieldsButton(data);
 }
 
 function applyCfRefreshState(enabled) {
@@ -588,7 +547,7 @@ function buildFieldCard(section, key, val) {
   return fieldCard;
 }
 
-async function saveConfig(options = {}) {
+async function saveConfig() {
   const btn = byId('save-btn');
   const originalText = btn.innerText;
   btn.disabled = true;
@@ -621,16 +580,6 @@ async function saveConfig(options = {}) {
       newConfig[s][k] = val;
     });
 
-    if (options.dropUnknown) {
-      const removed = dropUnknownFields(newConfig);
-      if (!removed) {
-        showToast(t('config.noUnknownFields'), 'info');
-        btn.disabled = false;
-        btn.innerText = originalText;
-        return;
-      }
-    }
-
     if (newConfig.proxy && newConfig.proxy.enabled) {
       const url = String(newConfig.proxy.flaresolverr_url || '').trim();
       if (!url) {
@@ -651,14 +600,8 @@ async function saveConfig(options = {}) {
     });
 
     if (res.ok) {
-      currentConfig = newConfig;
-      updateUnknownFieldsButton(currentConfig);
       btn.innerText = t('config.saved');
-      if (options.dropUnknown) {
-        showToast(t('config.cleanedUnknownFields'), 'success');
-      } else {
-        showToast(t('config.configSaved'), 'success');
-      }
+      showToast(t('config.configSaved'), 'success');
       setTimeout(() => {
         btn.innerText = originalText;
         btn.style.backgroundColor = '';
@@ -676,20 +619,6 @@ async function saveConfig(options = {}) {
       btn.disabled = false;
     }
   }
-}
-
-async function cleanUnknownFields() {
-  const unknown = collectUnknownFields(currentConfig);
-  if (!unknown.length) {
-    showToast(t('config.noUnknownFields'), 'info');
-    updateUnknownFieldsButton(currentConfig);
-    return;
-  }
-  const ok = window.confirm(
-    t('config.cleanUnknownConfirm', { count: unknown.length })
-  );
-  if (!ok) return;
-  await saveConfig({ dropUnknown: true });
 }
 
 async function copyToClipboard(text, btn) {

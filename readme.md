@@ -361,6 +361,7 @@ curl http://localhost:8000/v1/images/edits \
 |  | `filter_tags` | 过滤标签 | 自动过滤 Grok 响应中的特殊标签。 | `["xaiartifact","xai:tool_usage_card","grok:render"]` |
 | **proxy** | `base_proxy_url` | 基础代理 URL | 代理请求到 Grok 官网的基础服务地址。 | `""` |
 |  | `asset_proxy_url` | 资源代理 URL | 代理请求到 Grok 官网的静态资源（图片/视频）地址。 | `""` |
+|  | `cf_cookies` | CF Cookies | FlareSolverr 刷新写入的完整 Cookie 字符串。 | `""` |
 |  | `skip_proxy_ssl_verify` | 跳过代理 SSL 校验 | 代理使用自签名证书时启用（仅放行代理证书，目标站点仍校验）。 | `false` |
 |  | `enabled` | CF 自动刷新 | 是否启用 CF 自动刷新。 | `false` |
 |  | `flaresolverr_url` | FlareSolverr 地址 | FlareSolverr 服务的 HTTP 地址。 | `""` |

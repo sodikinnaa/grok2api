@@ -106,10 +106,6 @@
     "flaresolverrRequired": "FlareSolverr URL is required when auto-refresh is enabled",
     "generate": "Generate",
     "publicAccess": "Public Access",
-    "cleanUnknown": "Clean unknown fields",
-    "cleanUnknownConfirm": "Found {count} unknown fields. Clean them?",
-    "noUnknownFields": "No unknown fields found",
-    "cleanedUnknownFields": "Unknown fields cleaned",
     "noDesc": "No description available. Please refer to the documentation.",
     "sectionFallback": "{section} Settings",
     "sections": {

@@ -48,12 +48,14 @@ class AssetsDownloadReverse:
             url = f"{DOWNLOAD_API}{file_path}"
 
             # Get proxies
-            base_proxy = get_config("proxy.base_proxy_url")
-            assert_proxy = get_config("proxy.asset_proxy_url")
+            base_proxy = get_config("proxy.base_proxy_url") or ""
+            assert_proxy = get_config("proxy.asset_proxy_url") or ""
             if assert_proxy:
                 proxies = {"http": assert_proxy, "https": assert_proxy}
-            else:
+            elif base_proxy:
                 proxies = {"http": base_proxy, "https": base_proxy}
+            else:
+                proxies = None
 
             # Guess content type by extension for Accept/Sec-Fetch-Dest
             content_type = _CONTENT_TYPES.get(Path(urllib.parse.urlparse(file_path).path).suffix.lower())

@@ -21,15 +21,9 @@
   <main class="space-y-6 flex-1 container mx-auto max-w-5xl px-6 py-8 fade-in">
     <div class="space-y-6">
       <div class="flex justify-between items-center">
-        <div class="flex items-start gap-3">
-          <button id="clean-unknown-btn" onclick="cleanUnknownFields()"
-            class="geist-button-outline text-xs px-3 hidden" data-i18n="config.cleanUnknown">
-            清理未知字段
-          </button>
-          <div>
-            <h2 class="text-2xl font-semibold tracking-tight" data-i18n="config.title">配置管理</h2>
-            <p class="text-[var(--accents-4)] mt-1 text-sm" data-i18n="config.subtitle">管理 API 密钥及系统参数设置。</p>
-          </div>
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight" data-i18n="config.title">配置管理</h2>
+          <p class="text-[var(--accents-4)] mt-1 text-sm" data-i18n="config.subtitle">管理 API 密钥及系统参数设置。</p>
         </div>
         <button onclick="saveConfig()" id="save-btn" class="geist-button gap-2">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
