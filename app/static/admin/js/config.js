@@ -50,6 +50,7 @@ const LOCALE_MAP = {
     "stream": { title: "流式响应", desc: "是否默认启用流式输出。" },
     "thinking": { title: "思维链", desc: "是否默认启用思维链输出。" },
     "dynamic_statsig": { title: "动态指纹", desc: "是否默认启用动态生成 Statsig 指纹。" },
+    "custom_instruction": { title: "自定义指令", desc: "多行文本，会透传为 Grok 请求参数 customPersonality。" },
     "filter_tags": { title: "过滤标签", desc: "设置自动过滤 Grok 响应中的特殊标签。" }
   },
 
@@ -271,6 +272,15 @@ function buildTextInput(section, key, val) {
   return { input, node: input };
 }
 
+function buildTextareaInput(section, key, val, rows = 5) {
+  const input = document.createElement('textarea');
+  input.className = 'geist-input';
+  input.rows = rows;
+  input.value = val || '';
+  setInputMeta(input, section, key);
+  return { input, node: input };
+}
+
 function buildSecretInput(section, key, val) {
   const input = document.createElement('input');
   input.type = 'text';
@@ -447,7 +457,10 @@ function buildFieldCard(section, key, val) {
 
   // Input Logic
   let built;
-  if (typeof val === 'boolean') {
+  if (section === 'app' && key === 'custom_instruction') {
+    built = buildTextareaInput(section, key, val, 6);
+  }
+  else if (typeof val === 'boolean') {
     built = buildBooleanInput(section, key, val);
   }
   else if (key === 'image_format') {

@@ -236,8 +236,8 @@ class LocalStorage(BaseStorage):
                     if isinstance(val, bool):
                         val_str = "true" if val else "false"
                     elif isinstance(val, str):
-                        escaped = val.replace('"', '\\"')
-                        val_str = f'"{escaped}"'
+                        # Use JSON string escaping to keep TOML valid for multiline/control chars.
+                        val_str = json_dumps(val)
                     elif isinstance(val, (int, float)):
                         val_str = str(val)
                     elif isinstance(val, (list, dict)):
