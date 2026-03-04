@@ -32,6 +32,15 @@ cd grok2api
 docker compose up -d
 ```
 
+> Docker Compose 端口变量：
+>
+> - `SERVER_PORT`：容器内应用监听端口
+> - `HOST_PORT`：宿主机映射端口（仅 Docker Compose 使用）
+>
+> 小贴士：端口映射规则是 `HOST_PORT:SERVER_PORT`，你访问的是 `HOST_PORT`，容器内服务实际监听的是 `SERVER_PORT`。
+>
+> 示例：`HOST_PORT=9000 SERVER_PORT=8011 docker compose up -d`，访问 `http://localhost:9000`。
+
 ### Vercel 部署
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/chenyme/grok2api&env=LOG_LEVEL,LOG_FILE_ENABLED,DATA_DIR,SERVER_STORAGE_TYPE,SERVER_STORAGE_URL&envDefaults=%7B%22DATA_DIR%22%3A%22/tmp/data%22%2C%22LOG_FILE_ENABLED%22%3A%22false%22%2C%22LOG_LEVEL%22%3A%22INFO%22%2C%22SERVER_STORAGE_TYPE%22%3A%22local%22%2C%22SERVER_STORAGE_URL%22%3A%22%22%7D)
@@ -52,7 +61,7 @@ docker compose up -d
 
 ## 管理面板
 
-- 访问地址：`http://<host>:8000/admin`
+- 访问地址：`http://<host>:<port>/admin`（本地运行使用 `SERVER_PORT`，Docker Compose 使用 `HOST_PORT`，默认均为 `8000`）
 - 默认密码：`grok2api`（配置项 `app.app_key`，建议修改）
 
 **功能说明**：
@@ -77,6 +86,7 @@ docker compose up -d
 | `DATA_DIR` | 数据目录（配置/Token/锁） | `./data` | `/data` |
 | `SERVER_HOST` | 服务监听地址 | `0.0.0.0` | `0.0.0.0` |
 | `SERVER_PORT` | 服务端口 | `8000` | `8000` |
+| `HOST_PORT` | Docker Compose 宿主机映射端口 | `8000` | `9000` |
 | `SERVER_WORKERS` | Uvicorn worker 数量 | `1` | `2` |
 | `SERVER_STORAGE_TYPE` | 存储类型（`local`/`redis`/`mysql`/`pgsql`） | `local` | `pgsql` |
 | `SERVER_STORAGE_URL` | 存储连接串（local 时可为空） | `""` | `postgresql+asyncpg://user:password@host:5432/db` |
@@ -116,6 +126,8 @@ docker compose up -d
 <br>
 
 ## 接口说明
+
+> 以下示例默认使用 `localhost:8000`；若 Docker Compose 设置了 `HOST_PORT`，请替换为对应端口。
 
 ### `POST /v1/chat/completions`
 

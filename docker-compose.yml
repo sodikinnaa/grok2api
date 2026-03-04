@@ -3,13 +3,14 @@ services:
     container_name: grok2api
     image: ghcr.io/chenyme/grok2api:latest
     ports:
-      - "8000:8000"
+      - "${HOST_PORT:-8000}:${SERVER_PORT:-8000}"
     environment:
       TZ: Asia/Shanghai
-      LOG_LEVEL: INFO
-      SERVER_PORT: 8000
-      SERVER_WORKERS: 1
-      SERVER_STORAGE_TYPE: local
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SERVER_HOST: ${SERVER_HOST:-0.0.0.0}
+      SERVER_PORT: ${SERVER_PORT:-8000}
+      SERVER_WORKERS: ${SERVER_WORKERS:-1}
+      SERVER_STORAGE_TYPE: ${SERVER_STORAGE_TYPE:-local}
       # 启用 CF 自动刷新: 取消以下三行注释，并取消底部 flaresolverr 服务的注释
       # FLARESOLVERR_URL: http://flaresolverr:8191
       # CF_REFRESH_INTERVAL: "600"
@@ -20,6 +21,12 @@ services:
       #   Redis: redis://localhost:6379/0 or redis://:password@localhost:6379/0
       #   MySQL: mysql+aiomysql://user:pass@localhost/db
       #   PgSQL: postgresql+asyncpg://user:pass@localhost/db
+    command:
+      - sh
+      - -c
+      - >
+        uvicorn main:app --host "$${SERVER_HOST:-0.0.0.0}"
+        --port "$${SERVER_PORT:-8000}" --workers "$${SERVER_WORKERS:-1}"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
