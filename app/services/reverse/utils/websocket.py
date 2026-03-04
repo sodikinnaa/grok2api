@@ -129,13 +129,39 @@ class WebSocketClient:
         try:
             # Cast to Any to avoid Pylance errors with **extra_kwargs
             extra_kwargs: dict[str, Any] = dict(ws_kwargs or {})
-            ws = await session.ws_connect(
-                url,
-                headers=headers,
-                proxy=resolved_proxy,
-                ssl=self._ssl_context,
-                **extra_kwargs,
-            )
+            skip_proxy_ssl = bool(get_config("proxy.skip_proxy_ssl_verify")) and bool(proxy_url)
+            if skip_proxy_ssl and urlparse(proxy_url).scheme.lower() == "https":
+                proxy_ssl_context = ssl.create_default_context()
+                proxy_ssl_context.check_hostname = False
+                proxy_ssl_context.verify_mode = ssl.CERT_NONE
+                try:
+                    ws = await session.ws_connect(
+                        url,
+                        headers=headers,
+                        proxy=resolved_proxy,
+                        ssl=self._ssl_context,
+                        proxy_ssl=proxy_ssl_context,
+                        **extra_kwargs,
+                    )
+                except TypeError:
+                    logger.warning(
+                        "proxy.skip_proxy_ssl_verify is enabled, but aiohttp does not support proxy_ssl; keeping proxy SSL verification enabled"
+                    )
+                    ws = await session.ws_connect(
+                        url,
+                        headers=headers,
+                        proxy=resolved_proxy,
+                        ssl=self._ssl_context,
+                        **extra_kwargs,
+                    )
+            else:
+                ws = await session.ws_connect(
+                    url,
+                    headers=headers,
+                    proxy=resolved_proxy,
+                    ssl=self._ssl_context,
+                    **extra_kwargs,
+                )
             return WebSocketConnection(session, ws)
         except Exception:
             await session.close()
