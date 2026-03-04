@@ -1,6 +1,6 @@
 # Grok2API
 
-[中文](../readme.md) | **English**
+[中文](../readme.md) | **English** | [Docs](https://blog.cheny.me/blog/posts/grok2api)
 
 > [!NOTE]
 > This project is for learning and research only. You must comply with Grok **Terms of Use** and **local laws and regulations**. Do not use for illegal purposes.
@@ -15,6 +15,7 @@ Grok2API rebuilt with **FastAPI**, fully aligned with the latest web call format
 <br>
 
 ## Quick Start
+> [Docs](https://blog.cheny.me/blog/posts/grok2api)
 
 ### Local
 
