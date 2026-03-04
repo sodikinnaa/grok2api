@@ -40,11 +40,16 @@
   let activeStreamInfo = null;
   const feedbackUrl = 'https://github.com/chenyme/grok2api/issues/new';
   const CHAT_COMPLETIONS_ENDPOINT = '/v1/public/chat/completions';
+  const DEFAULT_SESSION_TITLES = ['新会话', 'New Session'];
 
   let sessionsData = null;
 
   function generateId() {
     return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+
+  function isDefaultTitleValue(title) {
+    return DEFAULT_SESSION_TITLES.includes(title);
   }
 
   function loadSessions() {
@@ -66,6 +71,7 @@
         sessions: [{
           id,
           title: t('chat.newSession'),
+          isDefaultTitle: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
           messages: []
@@ -73,6 +79,11 @@
       };
       saveSessions();
     }
+    sessionsData.sessions.forEach((session) => {
+      if (session && typeof session.isDefaultTitle === 'undefined') {
+        session.isDefaultTitle = isDefaultTitleValue(session.title);
+      }
+    });
     if (!sessionsData.activeId || !sessionsData.sessions.find(s => s.id === sessionsData.activeId)) {
       sessionsData.activeId = sessionsData.sessions[0].id;
     }
@@ -198,6 +209,7 @@
     const session = {
       id,
       title: t('chat.newSession'),
+      isDefaultTitle: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       messages: []
@@ -252,7 +264,7 @@
 
   function updateSessionTitle(session) {
     if (!session) return;
-    if (session.title && session.title !== t('chat.newSession')) return;
+    if (session.isDefaultTitle === false) return;
     const firstUser = session.messages.find(m => m.role === 'user');
     if (!firstUser) return;
     const text = getMessageDisplay(firstUser);
@@ -260,6 +272,7 @@
     const title = text.replace(/\n/g, ' ').trim().slice(0, 20);
     if (title) {
       session.title = title;
+      session.isDefaultTitle = false;
     }
   }
 
@@ -268,6 +281,7 @@
     if (!session) return;
     const trimmed = (newTitle || '').trim();
     session.title = trimmed || t('chat.newSession');
+    session.isDefaultTitle = !trimmed && isDefaultTitleValue(session.title);
     session.updatedAt = Date.now();
     saveSessions();
     renderSessionList();

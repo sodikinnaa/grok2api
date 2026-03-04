@@ -16,6 +16,13 @@
   var ready = false;
   var queue = [];
 
+  function getStaticVersion() {
+    var script = document.querySelector('script[src*="?v="]');
+    if (!script || !script.src) return '';
+    var m = script.src.match(/[?&]v=([^&]+)/);
+    return m ? m[1] : '';
+  }
+
   function detect() {
     try {
       var s = localStorage.getItem(STORAGE_KEY);
@@ -75,7 +82,9 @@
   function init() {
     lang = detect();
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
-    fetch('/static/i18n/locales/' + lang + '.json')
+    var version = getStaticVersion();
+    var url = '/static/i18n/locales/' + lang + '.json' + (version ? ('?v=' + encodeURIComponent(version)) : '');
+    fetch(url)
       .then(function (r) { if (!r.ok) throw r; return r.json(); })
       .then(function (j) { data = j; })
       .catch(function () { data = {}; })
