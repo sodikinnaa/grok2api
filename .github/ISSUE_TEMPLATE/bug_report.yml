@@ -1,0 +1,89 @@
+name: 错误 Bug
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        用于反馈项目当前存在的 BUG。请尽量提供最小复现信息，以便快速确认根因并修复。
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: 问题描述
+      description: 请清晰描述实际发生的异常现象。
+      placeholder: 例如：视频流式时思维链会重复出现。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 按顺序写出最小复现步骤。
+      placeholder: |
+        1. 使用 xxx 配置启动服务
+        2. 调用 xxx 接口，参数为 xxx
+        3. 观察到 xxx 错误
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+      description: 在相同条件下，你预期系统应如何表现。
+      placeholder: 例如：首次 </think> 后不应再次进入 isThinking=true 的片段。
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 实际结果与预期不一致的具体表现。
+      placeholder: 例如：后续仍输出了新的 isThinking=true 片段。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deploy-mode
+    attributes:
+      label: 部署方式
+      options:
+        - 本地 uv run
+        - Docker Compose
+        - Docker run
+        - Vercel
+        - Render
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本/提交号
+      description: 请填写 release 版本号或 commit hash，便于定位代码基线。
+      placeholder: 例如：v1.5.6 / 2bead4b
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志/报错
+      description: 请贴完整关键日志，敏感信息请打码。
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: request-sample
+    attributes:
+      label: 请求样例（可选）
+      description: 建议提供最小请求体或 curl，方便复现。
+      render: json
+    validations:
+      required: false

@@ -1,0 +1,42 @@
+name: 功能增强 Enhancement
+description: 对项目现有功能的增强、优化或能力扩展建议
+title: "enhancement: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        用于提交“对现有能力的增强建议”。请明确现状痛点、改进目标与预期收益。
+
+  - type: textarea
+    id: current
+    attributes:
+      label: 当前现状
+      description: 当前行为、限制或体验瓶颈是什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望改进
+      description: 你希望增强后的行为、接口或体验是什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: value
+    attributes:
+      label: 价值与场景
+      description: 该增强解决什么问题，适用于哪些场景？
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 备选方案（可选）
+      description: 可行的临时方案或替代实现（如有）。
+    validations:
+      required: false

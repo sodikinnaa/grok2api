@@ -1,0 +1,50 @@
+name: 问题 Question
+description: 对项目功能、行为或使用方式的疑问咨询
+title: "question: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        用于提交“对项目功能的疑问”。请提供必要上下文、配置与日志，便于快速定位并给出准确答复。
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 问题内容
+      description: 请明确你希望确认的行为、规则或用法。
+      placeholder: 例如：为什么单 token 调用视频会报 curl (92)，并发反而可以？
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deploy-mode
+    attributes:
+      label: 部署方式
+      options:
+        - 本地 uv run
+        - Docker Compose
+        - Docker run
+        - Vercel
+        - Render
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: 相关配置（请脱敏）
+      description: 建议提供 retry/proxy/token/video 等关键配置。
+      render: toml
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      render: shell
+    validations:
+      required: true

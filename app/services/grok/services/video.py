@@ -386,6 +386,7 @@ class VideoStreamProcessor(BaseProcessor):
         super().__init__(model, token)
         self.response_id: Optional[str] = None
         self.think_opened: bool = False
+        self.think_closed_once: bool = False
         self.role_sent: bool = False
 
         self.show_think = bool(show_think)
@@ -471,6 +472,8 @@ class VideoStreamProcessor(BaseProcessor):
                     self.role_sent = True
 
                 if token := resp.get("token"):
+                    if is_thinking and self.think_closed_once:
+                        continue
                     if is_thinking:
                         if not self.show_think:
                             continue
@@ -481,11 +484,14 @@ class VideoStreamProcessor(BaseProcessor):
                         if self.think_opened:
                             yield self._sse("\n</think>\n")
                             self.think_opened = False
+                            self.think_closed_once = True
                     yield self._sse(token)
                     continue
 
                 if video_resp := resp.get("streamingVideoGenerationResponse"):
                     progress = video_resp.get("progress", 0)
+                    if is_thinking and self.think_closed_once:
+                        continue
 
                     if is_thinking:
                         if not self.show_think:
@@ -497,6 +503,7 @@ class VideoStreamProcessor(BaseProcessor):
                         if self.think_opened:
                             yield self._sse("\n</think>\n")
                             self.think_opened = False
+                            self.think_closed_once = True
                     if self.show_think:
                         yield self._sse(f"正在生成视频中，当前进度{progress}%\n")
 
@@ -507,6 +514,7 @@ class VideoStreamProcessor(BaseProcessor):
                         if self.think_opened:
                             yield self._sse("\n</think>\n")
                             self.think_opened = False
+                            self.think_closed_once = True
 
                         if video_url:
                             if self.upscale_on_finish:
@@ -523,6 +531,7 @@ class VideoStreamProcessor(BaseProcessor):
 
             if self.think_opened:
                 yield self._sse("</think>\n")
+                self.think_closed_once = True
             yield self._sse(finish="stop")
             yield "data: [DONE]\n\n"
         except asyncio.CancelledError:

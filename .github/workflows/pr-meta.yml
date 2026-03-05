@@ -1,0 +1,79 @@
+name: PR Meta Checks
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate title and body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = (pr.title || "").trim();
+            const body = pr.body || "";
+
+            // Conventional Commits style, e.g. feat(api): add xxx
+            const titlePattern = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._\/-]+\))?!?:\s.+$/i;
+            if (!titlePattern.test(title)) {
+              core.setFailed(
+                "PR title must follow Conventional Commits, e.g. 'feat(api): add token disable toggle'."
+              );
+              return;
+            }
+
+            const requiredSections = ["## Summary", "## Changes", "## Verification"];
+            const missing = requiredSections.filter((section) => !body.includes(section));
+            if (missing.length > 0) {
+              core.setFailed(`PR body is missing required section(s): ${missing.join(", ")}`);
+              return;
+            }
+
+            const sectionContent = (start, endOptions) => {
+              const startIndex = body.indexOf(start);
+              if (startIndex === -1) return "";
+              const afterStart = body.slice(startIndex + start.length);
+              let endIndex = afterStart.length;
+              for (const end of endOptions) {
+                const idx = afterStart.indexOf(end);
+                if (idx !== -1 && idx < endIndex) endIndex = idx;
+              }
+              return afterStart.slice(0, endIndex).trim();
+            };
+
+            const stripTemplateNoise = (input) =>
+              input
+                .replace(/<!--[\s\S]*?-->/g, "")
+                .replace(/```[\s\S]*?```/g, "")
+                .trim();
+
+            const summary = sectionContent("## Summary", ["## Changes"]);
+            const verification = sectionContent("## Verification", ["## Breaking Changes"]);
+            if (!stripTemplateNoise(summary)) {
+              core.setFailed("`## Summary` cannot be empty.");
+              return;
+            }
+            if (!stripTemplateNoise(verification)) {
+              core.setFailed("`## Verification` cannot be empty.");
+              return;
+            }
+
+            const changesBlock = sectionContent("## Changes", ["## Related Issues", "## Verification"]);
+            const checkedItems = (changesBlock.match(/- \[x\]/gi) || []).length;
+            if (checkedItems === 0) {
+              core.setFailed("At least one item in `## Changes` must be checked.");
+              return;
+            }
+
+            const verificationChecked = (verification.match(/- \[x\]/gi) || []).length;
+            if (verificationChecked === 0) {
+              core.setFailed("At least one item in `## Verification` must be checked.");
+              return;
+            }

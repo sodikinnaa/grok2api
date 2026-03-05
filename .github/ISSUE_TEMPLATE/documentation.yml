@@ -1,0 +1,36 @@
+name: 文档 Documentation
+description: 补充、修正或优化项目相关文档
+title: "documentation: "
+labels:
+  - documentation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        用于提交文档相关问题与改进建议。请说明现状、影响和建议内容，便于快速更新。
+
+  - type: input
+    id: doc-location
+    attributes:
+      label: 文档位置
+      description: 请提供页面链接、文件路径或章节名。
+      placeholder: 例如：README.md / docs/deploy.md / 某页面 URL
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: 问题描述
+      description: 当前文档存在哪些不准确、缺失或歧义？
+      placeholder: 例如：步骤不完整、参数含义不清、示例命令过时。
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: 建议修改
+      description: 建议补充或修改为哪些内容（可附示例文本）。
+    validations:
+      required: false

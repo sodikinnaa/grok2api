@@ -279,7 +279,8 @@ function renderTable() {
     let statusClass = 'badge-gray';
     if (item.status === 'active') statusClass = 'badge-green';
     else if (item.status === 'cooling') statusClass = 'badge-orange';
-    else statusClass = 'badge-red';
+    else if (item.status === 'expired') statusClass = 'badge-red';
+    else statusClass = 'badge-gray';
     tdStatus.className = 'text-center';
     let statusHtml = `<span class="badge ${statusClass}">${item.status}</span>`;
     if (item.tags && item.tags.includes('nsfw')) {
@@ -300,10 +301,21 @@ function renderTable() {
     // Actions (Center)
     const tdActions = document.createElement('td');
     tdActions.className = 'text-center';
+    const isDisabled = item.status === 'disabled';
+    const toggleTitle = isDisabled ? t('token.enableToken') : t('token.disableToken');
+    const toggleIcon = isDisabled
+      ? '<polyline points="20 6 9 17 4 12"></polyline>'
+      : '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
+    const toggleClass = isDisabled
+      ? 'p-1 text-gray-400 hover:text-green-600 rounded'
+      : 'p-1 text-gray-400 hover:text-orange-600 rounded';
     tdActions.innerHTML = `
                 <div class="flex items-center justify-center gap-2">
                      <button onclick="refreshStatus('${item.token}')" class="p-1 text-gray-400 hover:text-black rounded" title="${t('token.refreshStatus')}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                     </button>
+                     <button onclick="toggleTokenEnabled(${originalIndex})" class="${toggleClass}" title="${toggleTitle}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${toggleIcon}</svg>
                      </button>
                      <button onclick="openEditModal(${originalIndex})" class="p-1 text-gray-400 hover:text-black rounded" title="${t('common.edit')}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -508,8 +520,68 @@ async function deleteToken(index) {
   syncToServer().then(loadData);
 }
 
+async function toggleTokenEnabled(index) {
+  const item = flatTokens[index];
+  if (!item) return;
+  const toDisabled = item.status !== 'disabled';
+  const targetStatus = toDisabled ? 'disabled' : 'active';
+  const confirmKey = toDisabled ? 'token.confirmDisable' : 'token.confirmEnable';
+  const okText = toDisabled ? t('token.disableToken') : t('token.enableToken');
+  const tokenLabel = item.token.length > 24
+    ? `${item.token.substring(0, 8)}...${item.token.substring(item.token.length - 16)}`
+    : item.token;
+  const ok = await confirmAction(t(confirmKey, { token: tokenLabel }), { okText });
+  if (!ok) return;
+  item.status = targetStatus;
+  await syncToServer();
+  await loadData();
+  showToast(toDisabled ? t('token.disableDone') : t('token.enableDone'), 'success');
+}
+
 function batchDelete() {
   startBatchDelete();
+}
+
+function _getBatchStatusTargets(targetStatus) {
+  const selected = getSelectedTokens();
+  if (selected.length === 0) return { selected, targets: [] };
+  const targets = selected.filter(item => item.status !== targetStatus);
+  return { selected, targets };
+}
+
+async function batchSetStatus(targetStatus) {
+  if (isBatchProcessing) {
+    showToast(t('common.taskInProgress'), 'info');
+    return;
+  }
+  const { selected, targets } = _getBatchStatusTargets(targetStatus);
+  if (selected.length === 0) {
+    showToast(t('common.noTokenSelected'), 'error');
+    return;
+  }
+  const toDisabled = targetStatus === 'disabled';
+  if (targets.length === 0) {
+    showToast(toDisabled ? t('token.noTokenToDisable') : t('token.noTokenToEnable'), 'info');
+    return;
+  }
+  const confirmKey = toDisabled ? 'token.confirmBatchDisable' : 'token.confirmBatchEnable';
+  const okText = toDisabled ? t('token.batchDisable') : t('token.batchEnable');
+  const ok = await confirmAction(t(confirmKey, { count: targets.length }), { okText });
+  if (!ok) return;
+  targets.forEach(item => {
+    item.status = targetStatus;
+  });
+  await syncToServer();
+  await loadData();
+  showToast(toDisabled ? t('token.batchDisableDone') : t('token.batchEnableDone'), 'success');
+}
+
+async function batchDisableTokens() {
+  await batchSetStatus('disabled');
+}
+
+async function batchEnableTokens() {
+  await batchSetStatus('active');
 }
 
 // Reconstruct object structure and save
@@ -817,10 +889,14 @@ function setActionButtonsState(selectedCount = null) {
   const disabled = isBatchProcessing;
   const exportBtn = byId('btn-batch-export');
   const updateBtn = byId('btn-batch-update');
+  const disableBtn = byId('btn-batch-disable');
+  const enableBtn = byId('btn-batch-enable');
   const nsfwBtn = byId('btn-batch-nsfw');
   const deleteBtn = byId('btn-batch-delete');
   if (exportBtn) exportBtn.disabled = disabled || count === 0;
   if (updateBtn) updateBtn.disabled = disabled || count === 0;
+  if (disableBtn) disableBtn.disabled = disabled || count === 0;
+  if (enableBtn) enableBtn.disabled = disabled || count === 0;
   if (nsfwBtn) nsfwBtn.disabled = disabled || count === 0;
   if (deleteBtn) deleteBtn.disabled = disabled || count === 0;
 }

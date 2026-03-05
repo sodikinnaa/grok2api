@@ -1,0 +1,34 @@
+name: 想法 Idea
+description: 对项目方向、产品能力或技术路线的探索性想法
+title: "idea: "
+labels:
+  - idea
+body:
+  - type: markdown
+    attributes:
+      value: |
+        用于讨论开放性想法与早期提案，不要求已有完整实现方案。
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: 想法描述
+      description: 想法的核心内容是什么？希望解决什么问题？
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 动机与价值
+      description: 为什么值得推进？预期价值和受益对象是什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: 风险与未知（可选）
+      description: 可能的风险、依赖项或不确定因素。
+    validations:
+      required: false

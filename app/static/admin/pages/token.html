@@ -130,7 +130,7 @@
               <th class="w-24" data-i18n="token.tableStatus">状态</th>
               <th class="w-20" data-i18n="token.tableQuota">额度</th>
               <th class="text-left" data-i18n="token.tableNote">备注</th>
-              <th class="w-32 text-center" data-i18n="token.tableActions">操作</th>
+              <th class="w-44 text-center" data-i18n="token.tableActions">操作</th>
             </tr>
           </thead>
           <tbody id="token-table-body">
@@ -187,6 +187,14 @@
       <button id="btn-batch-update" onclick="batchUpdate()"
         class="geist-button-outline text-xs px-3 gap-1 border-0 hover:bg-gray-100 justify-center" data-i18n="token.batchRefresh">
         刷新
+      </button>
+      <button id="btn-batch-disable" onclick="batchDisableTokens()"
+        class="geist-button-outline text-xs px-3 gap-1 border-0 hover:bg-gray-100 justify-center" data-i18n="token.batchDisable">
+        禁用
+      </button>
+      <button id="btn-batch-enable" onclick="batchEnableTokens()"
+        class="geist-button-outline text-xs px-3 gap-1 border-0 hover:bg-gray-100 justify-center" data-i18n="token.batchEnable">
+        启用
       </button>
       <button id="btn-batch-nsfw" onclick="batchEnableNSFW()"
         class="geist-button-outline text-xs px-3 gap-1 border-0 hover:bg-gray-100 justify-center" disabled>
