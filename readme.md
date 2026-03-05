@@ -21,13 +21,15 @@
 
 ```bash
 uv sync
-uv run main.py
+
+uv run granian --interface asgi --host 0.0.0.0 --port 8000 --workers 1 main:app
 ```
 
 ### Docker Compose
 
 ```bash
 git clone https://github.com/chenyme/grok2api
+
 cd grok2api
 
 docker compose up -d
@@ -88,7 +90,7 @@ docker compose up -d
 | `SERVER_HOST` | 服务监听地址 | `0.0.0.0` | `0.0.0.0` |
 | `SERVER_PORT` | 服务端口 | `8000` | `8000` |
 | `HOST_PORT` | Docker Compose 宿主机映射端口 | `8000` | `9000` |
-| `SERVER_WORKERS` | Uvicorn worker 数量 | `1` | `2` |
+| `SERVER_WORKERS` | 服务进程数量 | `1` | `2` |
 | `SERVER_STORAGE_TYPE` | 存储类型（`local`/`redis`/`mysql`/`pgsql`） | `local` | `pgsql` |
 | `SERVER_STORAGE_URL` | 存储连接串（local 时可为空） | `""` | `postgresql+asyncpg://user:password@host:5432/db` |
 

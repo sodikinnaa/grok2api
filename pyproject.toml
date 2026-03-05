@@ -22,7 +22,6 @@ dependencies = [
     "python-multipart>=0.0.21",
     "redis>=6.4.0",
     "sqlalchemy>=2.0.46",
-    "uvicorn>=0.37.0",
     "websockets>=16.0",
 ]
 
