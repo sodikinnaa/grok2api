@@ -1,4 +1,5 @@
 name: 错误 Bug
+description: 反馈项目当前存在的缺陷、异常或错误行为
 title: "bug: "
 labels:
   - bug
