@@ -70,4 +70,4 @@ EXPOSE 8000
 
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 
-CMD ["sh", "-c", "uvicorn main:app --host ${SERVER_HOST:-0.0.0.0} --port ${SERVER_PORT:-8000} --workers ${SERVER_WORKERS:-1}"]
+CMD ["sh", "-c", "granian --interface asgi --host ${SERVER_HOST:-0.0.0.0} --port ${SERVER_PORT:-8000} --workers ${SERVER_WORKERS:-1} main:app"]
