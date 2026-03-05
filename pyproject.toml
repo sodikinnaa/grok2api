@@ -13,6 +13,7 @@ dependencies = [
     "cryptography>=46.0.5",
     "curl-cffi>=0.13.0",
     "fastapi>=0.119.0",
+    "granian>=2.7.2",
     "greenlet>=3.3.1",
     "livekit>=1.0.25",
     "loguru>=0.7.3",
@@ -21,7 +22,6 @@ dependencies = [
     "python-multipart>=0.0.21",
     "redis>=6.4.0",
     "sqlalchemy>=2.0.46",
-    "uvicorn>=0.37.0",
     "websockets>=16.0",
 ]
 
