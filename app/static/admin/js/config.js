@@ -607,7 +607,16 @@ async function saveConfig() {
         btn.style.backgroundColor = '';
       }, 2000);
     } else {
-      showToast(t('common.saveFailed'), 'error');
+      let errMsg = t('common.saveFailed');
+      try {
+        const data = await res.json();
+        if (data && (data.detail || data.message)) {
+          errMsg = data.detail || data.message;
+        }
+      } catch (e) {
+        // ignore parse errors and keep generic fallback
+      }
+      showToast(errMsg, 'error');
     }
   } catch (e) {
     showToast(t('common.error') + ': ' + e.message, 'error');
