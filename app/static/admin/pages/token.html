@@ -9,8 +9,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/geist@1.0.0/dist/fonts/geist-sans/style.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/geist@1.0.0/dist/fonts/geist-mono/style.css" rel="stylesheet">
-  <link href="/static/common/css/common.css?v=1.5.5" rel="stylesheet">
-  <link href="/static/admin/css/token.css?v=1.5.5" rel="stylesheet">
+  <link href="/static/common/css/common.css?v=1.5.7" rel="stylesheet">
+  <link href="/static/admin/css/token.css?v=1.5.7" rel="stylesheet">
   <link href="/static/common/css/toast.css" rel="stylesheet">
 </head>
 
@@ -91,7 +91,7 @@
 
       <!-- Tab Filter (with ARIA) -->
       <div class="flex items-center gap-4 mb-4 border-b border-[var(--border)] overflow-x-auto hide-scrollbar"
-           role="tablist" aria-label="Token 状态筛选" id="status-tabs">
+           role="tablist" aria-label="Token 状态筛选" data-i18n-aria-label="token.statusFilterAria" id="status-tabs">
         <button class="tab-item active" role="tab" aria-selected="true"
                 data-filter="all" onclick="filterByStatus('all')">
           <span data-i18n="token.tabAll">全部</span> <span class="badge" id="tab-count-all">0</span>
@@ -304,12 +304,12 @@
 
   <script src="/static/common/js/draggable.js"></script>
   <script src="/static/i18n/i18n.js"></script>
-  <script src="/static/common/js/admin-auth.js?v=1.5.5"></script>
-  <script src="/static/common/js/batch-sse.js?v=1.5.5"></script>
-  <script src="/static/common/js/header.js?v=1.5.5"></script>
-  <script src="/static/common/js/footer.js?v=1.5.5"></script>
+  <script src="/static/common/js/admin-auth.js?v=1.5.7"></script>
+  <script src="/static/common/js/batch-sse.js?v=1.5.7"></script>
+  <script src="/static/common/js/header.js?v=1.5.7"></script>
+  <script src="/static/common/js/footer.js?v=1.5.7"></script>
   <script src="/static/common/js/toast.js"></script>
-  <script src="/static/admin/js/token.js?v=1.5.5"></script>
+  <script src="/static/admin/js/token.js?v=1.5.7"></script>
 </body>
 
 </html>

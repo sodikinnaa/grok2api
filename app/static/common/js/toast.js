@@ -48,7 +48,15 @@ function showToast(message, type = 'success') {
 
 (function showRateLimitNoticeOnce() {
   const noticeKey = 'grok2api_rate_limits_notice_v1';
-  const noticeText = typeof t === 'function' ? t('common.rateLimitNotice') : 'GROK 官方网页更新后未真实暴露 rate-limits 接口，导致无法准确计算 Token 剩余，请耐心等待官方接口上线，目前自动刷新后会更新为 8 次';
+  const translate = (key, fallback) => {
+    if (typeof t !== 'function') return fallback;
+    const value = t(key);
+    return value === key ? fallback : value;
+  };
+  const noticeText = translate(
+    'common.rateLimitNotice',
+    'GROK 官方网页更新后未真实暴露 rate-limits 接口，导致无法准确计算 Token 剩余，请耐心等待官方接口上线，目前自动刷新后会更新为 8 次'
+  );
   const path = window.location.pathname || '';
 
   if (!path.startsWith('/admin') || path.startsWith('/admin/login')) {
@@ -74,7 +82,7 @@ function showToast(message, type = 'success') {
 
     const title = document.createElement('div');
     title.className = 'notice-dialog-title';
-    title.textContent = typeof t === 'function' ? t('common.notice') : '提示';
+    title.textContent = translate('common.notice', '提示');
 
     const content = document.createElement('div');
     content.className = 'notice-dialog-content';
@@ -86,7 +94,7 @@ function showToast(message, type = 'success') {
     const confirmBtn = document.createElement('button');
     confirmBtn.type = 'button';
     confirmBtn.className = 'notice-dialog-confirm';
-    confirmBtn.textContent = typeof t === 'function' ? t('common.gotIt') : '我知道了';
+    confirmBtn.textContent = translate('common.gotIt', '我知道了');
 
     actions.appendChild(confirmBtn);
     dialog.appendChild(title);

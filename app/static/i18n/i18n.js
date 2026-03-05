@@ -73,6 +73,10 @@
       var v = get(data, el.getAttribute('data-i18n-title'));
       if (v !== undefined) el.title = v;
     });
+    c.querySelectorAll('[data-i18n-aria-label]').forEach(function (el) {
+      var v = get(data, el.getAttribute('data-i18n-aria-label'));
+      if (v !== undefined) el.setAttribute('aria-label', v);
+    });
     c.querySelectorAll('[data-i18n-html]').forEach(function (el) {
       var v = get(data, el.getAttribute('data-i18n-html'));
       if (v !== undefined) el.innerHTML = v;

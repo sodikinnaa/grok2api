@@ -75,9 +75,9 @@
                   <div class="settings-field">
                     <label class="field-label" for="concurrentSelect" data-i18n="imagine.concurrent">并发数量</label>
                     <select id="concurrentSelect" class="geist-input">
-                      <option value="1" selected>1 个任务</option>
-                      <option value="2">2 个任务</option>
-                      <option value="3">3 个任务</option>
+                      <option value="1" selected data-i18n="imagine.concurrentTask1">1 个任务</option>
+                      <option value="2" data-i18n="imagine.concurrentTask2">2 个任务</option>
+                      <option value="3" data-i18n="imagine.concurrentTask3">3 个任务</option>
                     </select>
                   </div>
                 </div>
@@ -142,7 +142,7 @@
             <div class="meta-grid">
             <div class="meta-item mode-item">
               <div class="meta-label" data-i18n="imagine.connectionMode">连接模式</div>
-              <div class="mode-switch" role="group" aria-label="Connection mode">
+              <div class="mode-switch" role="group" aria-label="Connection mode" data-i18n-aria-label="imagine.connectionModeAria">
                 <button class="mode-btn" data-mode="auto" type="button">Auto</button>
                 <button class="mode-btn" data-mode="ws" type="button">WS</button>
                 <button class="mode-btn" data-mode="sse" type="button">SSE</button>
@@ -221,7 +221,7 @@
       <span data-i18n="cache.clear">清空</span>
     </button>
     <span class="toolbar-sep"></span>
-    <button id="batchDownloadBtn" class="batch-download-btn geist-button-outline text-xs px-3 gap-1 border-0 hover:bg-gray-100" title="批量下载">
+    <button id="batchDownloadBtn" class="batch-download-btn geist-button-outline text-xs px-3 gap-1 border-0 hover:bg-gray-100" title="批量下载" data-i18n-title="imagine.batchDownloadTitle">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
         <polyline points="7 10 12 15 17 10"></polyline>
@@ -231,7 +231,7 @@
     </button>
     <div id="selectionToolbar" class="selection-toolbar hidden">
       <button id="toggleSelectAllBtn" class="geist-button-outline text-xs px-3 gap-1 border-0 hover:bg-gray-100" data-i18n="imagine.selectAll">全选</button>
-      <button id="downloadSelectedBtn" class="geist-button-outline text-xs px-3 gap-1 border-0 hover:bg-gray-100">下载 <span id="selectedCount" class="selected-count">0</span></button>
+      <button id="downloadSelectedBtn" class="geist-button-outline text-xs px-3 gap-1 border-0 hover:bg-gray-100"><span data-i18n="imagine.download">下载</span> <span id="selectedCount" class="selected-count">0</span></button>
     </div>
   </div>
 
