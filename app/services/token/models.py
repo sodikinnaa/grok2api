@@ -10,7 +10,7 @@ Token 数据模型
 
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 
 
@@ -70,6 +70,40 @@ class TokenInfo(BaseModel):
     tags: List[str] = Field(default_factory=list)
     note: str = ""
     last_asset_clear_at: Optional[int] = None
+
+    @field_validator("token", mode="before")
+    @classmethod
+    def _normalize_token(cls, value):
+        """Normalize copied tokens to avoid unicode punctuation issues."""
+        if value is None:
+            raise ValueError("token cannot be empty")
+        token = str(value)
+        token = token.translate(
+            str.maketrans(
+                {
+                    "\u2010": "-",
+                    "\u2011": "-",
+                    "\u2012": "-",
+                    "\u2013": "-",
+                    "\u2014": "-",
+                    "\u2212": "-",
+                    "\u00a0": " ",
+                    "\u2007": " ",
+                    "\u202f": " ",
+                    "\u200b": "",
+                    "\u200c": "",
+                    "\u200d": "",
+                    "\ufeff": "",
+                }
+            )
+        )
+        token = "".join(token.split())
+        if token.startswith("sso="):
+            token = token[4:]
+        token = token.encode("ascii", errors="ignore").decode("ascii")
+        if not token:
+            raise ValueError("token cannot be empty")
+        return token
 
     def is_available(self) -> bool:
         """检查是否可用（状态正常且配额 > 0）"""
