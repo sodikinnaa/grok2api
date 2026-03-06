@@ -14,7 +14,7 @@ The script self-initializes on DOM ready. No import/export — it attaches `wind
 ## File structure
 
 ```
-app/static/i18n/
+public/static/i18n/
   i18n.js                  # Core module (IIFE, ~110 lines)
   locales/
     zh.json                # Chinese (default/fallback)
@@ -139,7 +139,7 @@ if (toggle) toggle.textContent = I18n.getLang() === 'zh' ? 'EN' : '中';
 
 ## How to add a new language
 
-1. Create `app/static/i18n/locales/{code}.json` — copy `en.json` as a template
+1. Create `public/static/i18n/locales/{code}.json` — copy `en.json` as a template
 2. Translate every key (545+ keys across 10 namespaces)
 3. In `i18n.js`, add the code to the `SUPPORTED` array:
    ```js
