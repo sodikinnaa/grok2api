@@ -5,7 +5,7 @@ Grok video generation service.
 import asyncio
 import uuid
 import re
-from typing import Any, AsyncGenerator, AsyncIterable, Optional
+from typing import Any, AsyncGenerator, AsyncIterable, Optional, Tuple, List, Dict
 
 import orjson
 from curl_cffi.requests.errors import RequestsError
@@ -37,6 +37,174 @@ from app.services.token.manager import BASIC_POOL_NAME
 
 _VIDEO_SEMAPHORE = None
 _VIDEO_SEM_VALUE = 0
+_VIDEO_EXTENSION_EPS = 1.0 / 24.0
+
+
+def _build_mode_flag(preset: str) -> str:
+    mode_map = {
+        "fun": "--mode=extremely-crazy",
+        "normal": "--mode=normal",
+        "spicy": "--mode=extremely-spicy-or-crazy",
+        "custom": "--mode=custom",
+    }
+    return mode_map.get(preset, "--mode=custom")
+
+
+def _build_message(prompt: str, preset: str) -> str:
+    mode_flag = _build_mode_flag(preset)
+    message = f"{prompt} {mode_flag}".strip()
+    return message
+
+
+def _build_base_config(
+    parent_post_id: str,
+    aspect_ratio: str,
+    resolution_name: str,
+    video_length: int,
+) -> Dict[str, Any]:
+    return {
+        "modelMap": {
+            "videoGenModelConfig": {
+                "aspectRatio": aspect_ratio,
+                "parentPostId": parent_post_id,
+                "resolutionName": resolution_name,
+                "videoLength": video_length,
+            }
+        }
+    }
+
+
+def _build_extension_config(
+    *,
+    parent_post_id: str,
+    extend_post_id: str,
+    original_post_id: str,
+    original_prompt: str,
+    aspect_ratio: str,
+    resolution_name: str,
+    video_length: int,
+    start_time: float,
+) -> Dict[str, Any]:
+    return {
+        "modelMap": {
+            "videoGenModelConfig": {
+                "isVideoExtension": True,
+                "videoExtensionStartTime": start_time,
+                "extendPostId": extend_post_id,
+                "stitchWithExtendPostId": True,
+                "originalPrompt": original_prompt,
+                "originalPostId": original_post_id,
+                "originalRefType": "ORIGINAL_REF_TYPE_VIDEO_EXTENSION",
+                "mode": "custom",
+                "aspectRatio": aspect_ratio,
+                "videoLength": video_length,
+                "resolutionName": resolution_name,
+                "parentPostId": parent_post_id,
+                "isVideoEdit": False,
+            }
+        }
+    }
+
+
+def _compute_extension_steps(target_length: int, *, is_super: bool) -> List[int]:
+    if is_super:
+        base = 10 if target_length >= 10 else 6
+        chunk = 10
+    else:
+        base = 6
+        chunk = 6
+
+    steps = [base]
+    remaining = max(0, target_length - base)
+    full = remaining // chunk
+    rem = remaining % chunk
+    if full > 0:
+        steps.extend([chunk] * full)
+    if rem > 0:
+        steps.append(rem)
+    return steps
+
+
+def _extract_post_id(resp: dict, video_resp: Optional[dict]) -> Optional[str]:
+    post = resp.get("post")
+    if isinstance(post, dict):
+        value = post.get("id")
+        if isinstance(value, str) and value:
+            return value
+    for key in ("postId", "post_id"):
+        value = resp.get(key)
+        if isinstance(value, str) and value:
+            return value
+    if isinstance(video_resp, dict):
+        value = video_resp.get("postId")
+        if isinstance(value, str) and value:
+            return value
+        post = video_resp.get("post")
+        if isinstance(post, dict):
+            value = post.get("id")
+            if isinstance(value, str) and value:
+                return value
+    for key in ("parentPostId", "originalPostId"):
+        value = resp.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+async def _collect_video_metadata(
+    response: AsyncIterable[bytes],
+    *,
+    model: str,
+) -> Tuple[str, str, Optional[str]]:
+    """Collect video metadata without downloading assets."""
+    video_url = ""
+    thumbnail_url = ""
+    post_id: Optional[str] = None
+    idle_timeout = get_config("video.stream_timeout")
+
+    iterator = None
+    try:
+        iterator = _with_idle_timeout(response, idle_timeout, model)
+        async for line in iterator:
+            line = _normalize_line(line)
+            if not line:
+                continue
+            try:
+                data = orjson.loads(line)
+            except orjson.JSONDecodeError:
+                continue
+
+            resp = data.get("result", {}).get("response", {})
+            video_resp = resp.get("streamingVideoGenerationResponse")
+            if post_id is None:
+                post_id = _extract_post_id(resp, video_resp)
+
+            if isinstance(video_resp, dict) and video_resp.get("progress") == 100:
+                video_url = video_resp.get("videoUrl", "") or ""
+                thumbnail_url = video_resp.get("thumbnailImageUrl", "") or ""
+                break
+    finally:
+        if iterator is not None:
+            aclose = getattr(iterator, "aclose", None)
+            if callable(aclose):
+                try:
+                    await aclose()
+                except Exception:
+                    pass
+        aclose = getattr(response, "aclose", None)
+        if callable(aclose):
+            try:
+                await aclose()
+            except Exception:
+                pass
+        close = getattr(response, "close", None)
+        if callable(close):
+            try:
+                close()
+            except Exception:
+                pass
+
+    return video_url, thumbnail_url, post_id
 
 def _get_video_semaphore() -> asyncio.Semaphore:
     """Reverse 接口并发控制（video 服务）。"""
@@ -119,23 +287,10 @@ class VideoService:
             f"Video generation: prompt='{prompt[:50]}...', ratio={aspect_ratio}, length={video_length}s, preset={preset}"
         )
         post_id = await self.create_post(token, prompt)
-        mode_map = {
-            "fun": "--mode=extremely-crazy",
-            "normal": "--mode=normal",
-            "spicy": "--mode=extremely-spicy-or-crazy",
-        }
-        mode_flag = mode_map.get(preset, "--mode=custom")
-        message = f"{prompt} {mode_flag}"
-        model_config_override = {
-            "modelMap": {
-                "videoGenModelConfig": {
-                    "aspectRatio": aspect_ratio,
-                    "parentPostId": post_id,
-                    "resolutionName": resolution_name,
-                    "videoLength": video_length,
-                }
-            }
-        }
+        message = _build_message(prompt, preset)
+        model_config_override = _build_base_config(
+            post_id, aspect_ratio, resolution_name, video_length
+        )
 
         async def _stream():
             session = _new_session()
@@ -161,6 +316,11 @@ class VideoService:
                 if isinstance(e, AppException):
                     raise
                 raise UpstreamException(f"Video generation error: {str(e)}")
+            finally:
+                try:
+                    await session.close()
+                except Exception:
+                    pass
 
         return _stream()
 
@@ -179,23 +339,10 @@ class VideoService:
             f"Image to video: prompt='{prompt[:50]}...', image={image_url[:80]}"
         )
         post_id = await self.create_image_post(token, image_url)
-        mode_map = {
-            "fun": "--mode=extremely-crazy",
-            "normal": "--mode=normal",
-            "spicy": "--mode=extremely-spicy-or-crazy",
-        }
-        mode_flag = mode_map.get(preset, "--mode=custom")
-        message = f"{prompt} {mode_flag}"
-        model_config_override = {
-            "modelMap": {
-                "videoGenModelConfig": {
-                    "aspectRatio": aspect_ratio,
-                    "parentPostId": post_id,
-                    "resolutionName": resolution,
-                    "videoLength": video_length,
-                }
-            }
-        }
+        message = _build_message(prompt, preset)
+        model_config_override = _build_base_config(
+            post_id, aspect_ratio, resolution, video_length
+        )
 
         async def _stream():
             session = _new_session()
@@ -221,6 +368,11 @@ class VideoService:
                 if isinstance(e, AppException):
                     raise
                 raise UpstreamException(f"Video generation error: {str(e)}")
+            finally:
+                try:
+                    await session.close()
+                except Exception:
+                    pass
 
         return _stream()
 
@@ -279,7 +431,14 @@ class VideoService:
             if token.startswith("sso="):
                 token = token[4:]
             pool_name = token_mgr.get_pool_name_for_token(token)
-            should_upscale = resolution == "720p" and pool_name == BASIC_POOL_NAME
+            requested_resolution = resolution
+            should_upscale = requested_resolution == "720p" and pool_name == BASIC_POOL_NAME
+            generation_resolution = (
+                "480p" if should_upscale else requested_resolution
+            )
+            steps = _compute_extension_steps(
+                int(video_length or 6), is_super=pool_name != BASIC_POOL_NAME
+            )
 
             try:
                 # Handle image attachments.
@@ -302,27 +461,166 @@ class VideoService:
 
                 # Generate video.
                 service = VideoService()
+                message = _build_message(prompt, preset)
+                model_info = ModelService.get(model)
+                effort = (
+                    EffortType.HIGH
+                    if (model_info and model_info.cost.value == "high")
+                    else EffortType.LOW
+                )
+
+                if len(steps) == 1:
+                    if image_url:
+                        response = await service.generate_from_image(
+                            token,
+                            prompt,
+                            image_url,
+                            aspect_ratio,
+                            steps[0],
+                            generation_resolution,
+                            preset,
+                        )
+                    else:
+                        response = await service.generate(
+                            token,
+                            prompt,
+                            aspect_ratio,
+                            steps[0],
+                            generation_resolution,
+                            preset,
+                        )
+
+                    # Process response.
+                    if is_stream:
+                        processor = VideoStreamProcessor(
+                            model,
+                            token,
+                            show_think,
+                            upscale_on_finish=should_upscale,
+                        )
+                        return wrap_stream_with_usage(
+                            processor.process(response), token_mgr, token, model
+                        )
+
+                    result = await VideoCollectProcessor(
+                        model, token, upscale_on_finish=should_upscale
+                    ).process(response)
+                    try:
+                        await token_mgr.consume(token, effort)
+                        logger.debug(
+                            f"Video completed, recorded usage (effort={effort.value})"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to record video usage: {e}")
+                    return result
+
+                # Multi-step extension flow (avoid intermediate downloads).
                 if image_url:
-                    response = await service.generate_from_image(
-                        token,
-                        prompt,
-                        image_url,
+                    parent_post_id = await service.create_image_post(token, image_url)
+                else:
+                    parent_post_id = await service.create_post(token, prompt)
+
+                original_post_id = parent_post_id
+                extend_post_id = parent_post_id
+                current_length = 0
+
+                async def _request_stream(model_config_override: Dict[str, Any]) -> AsyncGenerator[bytes, None]:
+                    async def _stream():
+                        session = _new_session()
+                        try:
+                            async with _get_video_semaphore():
+                                stream_response = await AppChatReverse.request(
+                                    session,
+                                    token,
+                                    message=message,
+                                    model="grok-3",
+                                    tool_overrides={"videoGen": True},
+                                    model_config_override=model_config_override,
+                                )
+                                async for line in stream_response:
+                                    yield line
+                        finally:
+                            try:
+                                await session.close()
+                            except Exception:
+                                pass
+
+                    return _stream()
+
+                # Run intermediate steps (collect metadata only).
+                for idx, step_length in enumerate(steps[:-1]):
+                    if idx == 0:
+                        model_config_override = _build_base_config(
+                            parent_post_id,
+                            aspect_ratio,
+                            generation_resolution,
+                            step_length,
+                        )
+                    else:
+                        start_time = float(current_length) + _VIDEO_EXTENSION_EPS
+                        model_config_override = _build_extension_config(
+                            parent_post_id=parent_post_id,
+                            extend_post_id=extend_post_id,
+                            original_post_id=original_post_id,
+                            original_prompt=prompt,
+                            aspect_ratio=aspect_ratio,
+                            resolution_name=generation_resolution,
+                            video_length=step_length,
+                            start_time=start_time,
+                        )
+
+                    async with _new_session() as session:
+                        async with _get_video_semaphore():
+                            response = await AppChatReverse.request(
+                                session,
+                                token,
+                                message=message,
+                                model="grok-3",
+                                tool_overrides={"videoGen": True},
+                                model_config_override=model_config_override,
+                            )
+                            video_url, _, post_id = await _collect_video_metadata(
+                                response, model=model
+                            )
+                    if post_id:
+                        extend_post_id = post_id
+                    current_length += step_length
+
+                    try:
+                        await token_mgr.consume(token, effort)
+                        logger.debug(
+                            f"Video step completed, recorded usage (effort={effort.value})"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to record video usage: {e}")
+
+                    if not video_url:
+                        raise UpstreamException("Video extension step did not return url")
+
+                # Final step (render only once).
+                final_length = steps[-1]
+                if len(steps) == 1:
+                    final_config = _build_base_config(
+                        parent_post_id,
                         aspect_ratio,
-                        video_length,
-                        resolution,
-                        preset,
+                        generation_resolution,
+                        final_length,
                     )
                 else:
-                    response = await service.generate(
-                        token,
-                        prompt,
-                        aspect_ratio,
-                        video_length,
-                        resolution,
-                        preset,
+                    start_time = float(current_length) + _VIDEO_EXTENSION_EPS
+                    final_config = _build_extension_config(
+                        parent_post_id=parent_post_id,
+                        extend_post_id=extend_post_id,
+                        original_post_id=original_post_id,
+                        original_prompt=prompt,
+                        aspect_ratio=aspect_ratio,
+                        resolution_name=generation_resolution,
+                        video_length=final_length,
+                        start_time=start_time,
                     )
 
-                # Process response.
+                final_response = await _request_stream(final_config)
+
                 if is_stream:
                     processor = VideoStreamProcessor(
                         model,
@@ -331,19 +629,13 @@ class VideoService:
                         upscale_on_finish=should_upscale,
                     )
                     return wrap_stream_with_usage(
-                        processor.process(response), token_mgr, token, model
+                        processor.process(final_response), token_mgr, token, model
                     )
 
                 result = await VideoCollectProcessor(
                     model, token, upscale_on_finish=should_upscale
-                ).process(response)
+                ).process(final_response)
                 try:
-                    model_info = ModelService.get(model)
-                    effort = (
-                        EffortType.HIGH
-                        if (model_info and model_info.cost.value == "high")
-                        else EffortType.LOW
-                    )
                     await token_mgr.consume(token, effort)
                     logger.debug(
                         f"Video completed, recorded usage (effort={effort.value})"

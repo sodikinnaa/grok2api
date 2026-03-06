@@ -115,14 +115,47 @@ def _normalize_tools_for_chat(tools: Optional[List[Dict[str, Any]]]) -> Optional
     return normalized or None
 
 
-def _content_item_from_input(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def normalize_input_item(item: Any) -> Optional[Dict[str, Any]]:
+    """
+    Normalize a single input item to a unified structure.
+
+    Returns:
+        {"kind": "message", "message": {...}}
+        {"kind": "tool", "message": {...}}
+        {"kind": "block", "block": {...}}
+    """
+    if item is None:
+        return None
+
+    if isinstance(item, str):
+        return {"kind": "block", "block": {"type": "text", "text": item}}
+
     if not isinstance(item, dict):
         return None
+
     item_type = item.get("type")
+
+    if item_type == "message":
+        role = item.get("role") or "user"
+        return {"kind": "message", "message": {"role": role, "content": _normalize_content(item.get("content"))}}
+
+    if "role" in item and "content" in item:
+        role = item.get("role") or "user"
+        return {"kind": "message", "message": {"role": role, "content": _normalize_content(item.get("content"))}}
+
+    if item_type in _TOOL_OUTPUT_TYPES:
+        call_id = (
+            item.get("call_id")
+            or item.get("tool_call_id")
+            or item.get("id")
+            or _new_tool_call_id()
+        )
+        output = item.get("output") or item.get("content") or ""
+        return {"kind": "tool", "message": {"role": "tool", "tool_call_id": call_id, "content": output}}
 
     if item_type in {"input_text", "text", "output_text"}:
         text = item.get("text") or item.get("content") or ""
-        return {"type": "text", "text": text}
+        return {"kind": "block", "block": {"type": "text", "text": text}}
 
     if item_type in {"input_image", "image", "image_url", "output_image"}:
         image_url = item.get("image_url")
@@ -141,7 +174,7 @@ def _content_item_from_input(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         image_payload = {"url": url}
         if detail:
             image_payload["detail"] = detail
-        return {"type": "image_url", "image_url": image_payload}
+        return {"kind": "block", "block": {"type": "image_url", "image_url": image_payload}}
 
     if item_type in {"input_file", "file"}:
         file_data = item.get("file_data")
@@ -156,34 +189,19 @@ def _content_item_from_input(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             file_payload["file_id"] = file_id
         if not file_payload:
             return None
-        return {"type": "file", "file": file_payload}
+        return {"kind": "block", "block": {"type": "file", "file": file_payload}}
 
     if item_type in {"input_audio", "audio"}:
         audio = item.get("audio") or {}
         data = audio.get("data") or item.get("data")
         if not data:
             return None
-        return {"type": "input_audio", "input_audio": {"data": data}}
+        return {"kind": "block", "block": {"type": "input_audio", "input_audio": {"data": data}}}
 
     return None
 
 
-def _message_from_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    if not isinstance(item, dict):
-        return None
-
-    if item.get("type") == "message":
-        role = item.get("role") or "user"
-        content = item.get("content")
-        return {"role": role, "content": _coerce_content(content)}
-
-    if "role" in item and "content" in item:
-        return {"role": item.get("role") or "user", "content": _coerce_content(item.get("content"))}
-
-    return None
-
-
-def _coerce_content(content: Any) -> Any:
+def _normalize_content(content: Any) -> Any:
     if content is None:
         return ""
     if isinstance(content, str):
@@ -193,12 +211,9 @@ def _coerce_content(content: Any) -> Any:
     if isinstance(content, list):
         blocks: List[Dict[str, Any]] = []
         for item in content:
-            if isinstance(item, dict) and item.get("type") in {"input_text", "output_text"}:
-                blocks.append({"type": "text", "text": item.get("text", "")})
-                continue
-            block = _content_item_from_input(item) if isinstance(item, dict) else None
-            if block:
-                blocks.append(block)
+            normalized = normalize_input_item(item)
+            if normalized and normalized["kind"] == "block":
+                blocks.append(normalized["block"])
         return blocks if blocks else ""
     return str(content)
 
@@ -210,12 +225,13 @@ def _coerce_input_to_messages(input_value: Any) -> List[Dict[str, Any]]:
         return [{"role": "user", "content": input_value}]
 
     if isinstance(input_value, dict):
-        msg = _message_from_item(input_value)
-        if msg:
-            return [msg]
-        content_item = _content_item_from_input(input_value)
-        if content_item:
-            return [{"role": "user", "content": [content_item]}]
+        normalized = normalize_input_item(input_value)
+        if not normalized:
+            return []
+        if normalized["kind"] in {"message", "tool"}:
+            return [normalized["message"]]
+        if normalized["kind"] == "block":
+            return [{"role": "user", "content": [normalized["block"]]}]
         return []
 
     if not isinstance(input_value, list):
@@ -231,33 +247,16 @@ def _coerce_input_to_messages(input_value: Any) -> List[Dict[str, Any]]:
             pending_blocks = []
 
     for item in input_value:
-        if isinstance(item, dict):
-            msg = _message_from_item(item)
-            if msg:
-                _flush_pending()
-                messages.append(msg)
-                continue
-
-            item_type = item.get("type")
-            if item_type in _TOOL_OUTPUT_TYPES:
-                _flush_pending()
-                call_id = (
-                    item.get("call_id")
-                    or item.get("tool_call_id")
-                    or item.get("id")
-                    or _new_tool_call_id()
-                )
-                output = item.get("output") or item.get("content") or ""
-                messages.append({"role": "tool", "tool_call_id": call_id, "content": output})
-                continue
-
-            block = _content_item_from_input(item)
-            if block:
-                pending_blocks.append(block)
-                continue
-
-        if isinstance(item, str):
-            pending_blocks.append({"type": "text", "text": item})
+        normalized = normalize_input_item(item)
+        if not normalized:
+            continue
+        if normalized["kind"] in {"message", "tool"}:
+            _flush_pending()
+            messages.append(normalized["message"])
+            continue
+        if normalized["kind"] == "block":
+            pending_blocks.append(normalized["block"])
+            continue
 
     _flush_pending()
     return messages

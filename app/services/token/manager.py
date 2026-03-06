@@ -19,6 +19,7 @@ from app.core.config import get_config
 from app.core.exceptions import UpstreamException
 from app.services.token.pool import TokenPool
 from app.services.grok.batch_services.usage import UsageService
+from app.services.reverse.utils.retry import RetryContext, extract_retry_after
 
 
 DEFAULT_REFRESH_BATCH_SIZE = 10
@@ -879,6 +880,42 @@ class TokenManager:
         recovered = 0
         expired = 0
 
+        def _extract_status(error: Exception) -> Optional[int]:
+            if isinstance(error, UpstreamException):
+                if error.details and "status" in error.details:
+                    return error.details["status"]
+                return getattr(error, "status_code", None)
+            return None
+
+        async def _get_usage_with_retry(token_str: str) -> tuple[Optional[dict], Optional[int], Optional[Exception]]:
+            ctx = RetryContext()
+            # Match previous behavior: 3 attempts total (initial + 2 retries).
+            ctx.max_retry = min(ctx.max_retry, 2)
+            while True:
+                try:
+                    return await usage_service.get(token_str), None, None
+                except Exception as e:
+                    status = _extract_status(e)
+                    if status is None:
+                        return None, None, e
+
+                    ctx.record_error(status, e)
+                    if not ctx.should_retry(status):
+                        return None, status, e
+
+                    retry_after = extract_retry_after(e)
+                    delay = ctx.calculate_delay(status, retry_after)
+                    if ctx.total_delay + delay > ctx.retry_budget:
+                        return None, status, e
+
+                    ctx.record_delay(delay)
+                    logger.warning(
+                        f"Token {token_str[:10]}...: refresh retry {ctx.attempt}/{ctx.max_retry} "
+                        f"for status {status}, waiting {delay:.2f}s"
+                        + (f", Retry-After: {retry_after}s" if retry_after else "")
+                    )
+                    await asyncio.sleep(delay)
+
         async def _refresh_one(item: tuple[str, TokenInfo]) -> dict:
             """刷新单个 token"""
             _, token_info = item
@@ -887,84 +924,66 @@ class TokenManager:
                 if token_str.startswith("sso="):
                     token_str = token_str[4:]
 
-                # 重试逻辑：最多 2 次重试
-                for retry in range(3):  # 0, 1, 2
-                    try:
-                        result = await usage_service.get(token_str)
+                result, status, error = await _get_usage_with_retry(token_str)
 
-                        if result and "remainingTokens" in result:
-                            new_quota = result.get("remainingTokens")
-                            if new_quota is None:
-                                new_quota = result.get("remainingQueries")
-                            if new_quota is None:
-                                return {"recovered": False, "expired": False}
-                            old_quota = token_info.quota
-                            old_status = token_info.status
-
-                            token_info.update_quota(new_quota)
-                            token_info.mark_synced()
-
-                            window_size = self._extract_window_size_seconds(result)
-                            if window_size is not None:
-                                current_pool = self.get_pool_name_for_token(token_info.token)
-                                if (
-                                    current_pool == SUPER_POOL_NAME
-                                    and window_size >= SUPER_WINDOW_THRESHOLD_SECONDS
-                                ):
-                                    self._move_token_pool(
-                                        token_info,
-                                        SUPER_POOL_NAME,
-                                        BASIC_POOL_NAME,
-                                        reason=f"windowSizeSeconds={window_size}",
-                                    )
-                                elif (
-                                    current_pool == BASIC_POOL_NAME
-                                    and window_size < SUPER_WINDOW_THRESHOLD_SECONDS
-                                ):
-                                    self._move_token_pool(
-                                        token_info,
-                                        BASIC_POOL_NAME,
-                                        SUPER_POOL_NAME,
-                                        reason=f"windowSizeSeconds={window_size}",
-                                    )
-
-                            logger.info(
-                                f"Token {token_info.token[:10]}...: refreshed "
-                                f"{old_quota} -> {new_quota}, status: {old_status} -> {token_info.status}"
-                            )
-
-                            return {
-                                "recovered": new_quota > 0 and old_quota == 0,
-                                "expired": False,
-                            }
-
+                if result and "remainingTokens" in result:
+                    new_quota = result.get("remainingTokens")
+                    if new_quota is None:
+                        new_quota = result.get("remainingQueries")
+                    if new_quota is None:
                         return {"recovered": False, "expired": False}
+                    old_quota = token_info.quota
+                    old_status = token_info.status
 
-                    except Exception as e:
-                        error_str = str(e)
+                    token_info.update_quota(new_quota)
+                    token_info.mark_synced()
 
-                        # 检查是否为 401 错误
-                        if "401" in error_str or "Unauthorized" in error_str:
-                            if retry < 2:
-                                logger.warning(
-                                    f"Token {token_info.token[:10]}...: 401 error, "
-                                    f"retry {retry + 1}/2..."
-                                )
-                                await asyncio.sleep(0.5)
-                                continue
-                            else:
-                                # 重试 2 次后仍然 401，标记为 expired
-                                logger.error(
-                                    f"Token {token_info.token[:10]}...: 401 after 2 retries, "
-                                    f"marking as expired"
-                                )
-                                token_info.status = TokenStatus.EXPIRED
-                                return {"recovered": False, "expired": True}
-                        else:
-                            logger.warning(
-                                f"Token {token_info.token[:10]}...: refresh failed ({e})"
+                    window_size = self._extract_window_size_seconds(result)
+                    if window_size is not None:
+                        current_pool = self.get_pool_name_for_token(token_info.token)
+                        if (
+                            current_pool == SUPER_POOL_NAME
+                            and window_size >= SUPER_WINDOW_THRESHOLD_SECONDS
+                        ):
+                            self._move_token_pool(
+                                token_info,
+                                SUPER_POOL_NAME,
+                                BASIC_POOL_NAME,
+                                reason=f"windowSizeSeconds={window_size}",
                             )
-                            return {"recovered": False, "expired": False}
+                        elif (
+                            current_pool == BASIC_POOL_NAME
+                            and window_size < SUPER_WINDOW_THRESHOLD_SECONDS
+                        ):
+                            self._move_token_pool(
+                                token_info,
+                                BASIC_POOL_NAME,
+                                SUPER_POOL_NAME,
+                                reason=f"windowSizeSeconds={window_size}",
+                            )
+
+                    logger.info(
+                        f"Token {token_info.token[:10]}...: refreshed "
+                        f"{old_quota} -> {new_quota}, status: {old_status} -> {token_info.status}"
+                    )
+
+                    return {
+                        "recovered": new_quota > 0 and old_quota == 0,
+                        "expired": False,
+                    }
+
+                if status == 401:
+                    logger.error(
+                        f"Token {token_info.token[:10]}...: 401 after retries, "
+                        f"marking as expired"
+                    )
+                    token_info.status = TokenStatus.EXPIRED
+                    return {"recovered": False, "expired": True}
+
+                if error:
+                    logger.warning(
+                        f"Token {token_info.token[:10]}...: refresh failed ({error})"
+                    )
 
                 return {"recovered": False, "expired": False}
 

@@ -38,7 +38,7 @@ class VideoConfig(BaseModel):
     """视频生成配置"""
 
     aspect_ratio: Optional[str] = Field("3:2", description="视频比例: 1280x720(16:9), 720x1280(9:16), 1792x1024(3:2), 1024x1792(2:3), 1024x1024(1:1)")
-    video_length: Optional[int] = Field(6, description="视频时长(秒): 6 / 10 / 15")
+    video_length: Optional[int] = Field(6, description="视频时长(秒): 6-30")
     resolution_name: Optional[str] = Field("480p", description="视频分辨率: 480p, 720p")
     preset: Optional[str] = Field("custom", description="风格预设: fun, normal, spicy")
 
@@ -653,9 +653,12 @@ def validate_request(request: ChatCompletionRequest):
             )
         config.aspect_ratio = ratio_map[config.aspect_ratio]
 
-        if config.video_length not in (6, 10, 15):
+        if config.video_length is None:
+            config.video_length = 6
+        config.video_length = int(config.video_length)
+        if config.video_length < 6 or config.video_length > 30:
             raise ValidationException(
-                message="video_length must be 6, 10, or 15 seconds",
+                message="video_length must be between 6 and 30 seconds",
                 param="video_config.video_length",
                 code="invalid_video_length",
             )

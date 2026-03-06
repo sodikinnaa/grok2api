@@ -147,9 +147,9 @@ async def public_video_start(data: VideoStartRequest):
         )
 
     video_length = int(data.video_length or 6)
-    if video_length not in (6, 10, 15):
+    if video_length < 6 or video_length > 30:
         raise HTTPException(
-            status_code=400, detail="video_length must be 6, 10, or 15 seconds"
+            status_code=400, detail="video_length must be between 6 and 30 seconds"
         )
 
     resolution_name = str(data.resolution_name or "480p")

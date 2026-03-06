@@ -74,11 +74,7 @@
             </div>
             <div class="settings-block length-block">
               <label class="field-label" for="lengthSelect" data-i18n="video.duration">视频时长</label>
-              <select id="lengthSelect" class="geist-input">
-                <option value="6" selected data-i18n="video.sec6">6 秒</option>
-                <option value="10" data-i18n="video.sec10">10 秒</option>
-                <option value="15" data-i18n="video.sec15">15 秒</option>
-              </select>
+              <input id="lengthSelect" class="geist-input" type="number" min="6" max="30" step="1" value="6" />
             </div>
             <div class="settings-block resolution-block">
               <label class="field-label" for="resolutionSelect" data-i18n="video.resolution">分辨率</label>
