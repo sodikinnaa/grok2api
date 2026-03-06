@@ -25,6 +25,12 @@ dependencies = [
     "websockets>=16.0",
 ]
 
+[project.scripts]
+app = "main:app"
+
+[tool.vercel.scripts]
+build = "python scripts/vercel_prepare_static.py"
+
 [dependency-groups]
 dev = [
     "ruff>=0.15.0",
