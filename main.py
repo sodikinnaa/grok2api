@@ -13,7 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
-PUBLIC_DIR = BASE_DIR / "public"
+PUBLIC_DIR = BASE_DIR / "_public"
 
 # Ensure the project root is on sys.path (helps when Vercel sets a different CWD)
 if str(BASE_DIR) not in sys.path:
@@ -152,7 +152,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(files_router, prefix="/v1/files")
 
-    # 静态文件服务（统一使用 /public/static）
+    # 静态文件服务（统一使用 /_public/static）
     static_dir = PUBLIC_DIR / "static"
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=static_dir), name="static")

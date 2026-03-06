@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from app.core.auth import is_public_enabled
 
 router = APIRouter()
-STATIC_DIR = Path(__file__).resolve().parents[3] / "public" / "static"
+STATIC_DIR = Path(__file__).resolve().parents[3] / "_public" / "static"
 
 
 def _public_page_response(relative_path: str) -> FileResponse:
