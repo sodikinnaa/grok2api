@@ -111,7 +111,7 @@
 
   async function loadFilterDefaults() {
     try {
-      const res = await fetch('/v1/public/imagine/config', { cache: 'no-store' });
+      const res = await fetch('/v1/function/imagine/config', { cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json();
       const value = parseInt(data && data.final_min_bytes, 10);
@@ -218,7 +218,7 @@
   }
 
   async function createImagineTask(prompt, ratio, authHeader, nsfwEnabled) {
-    const res = await fetch('/v1/public/imagine/start', {
+    const res = await fetch('/v1/function/imagine/start', {
       method: 'POST',
       headers: {
         ...buildAuthHeaders(authHeader),
@@ -249,7 +249,7 @@
   async function stopImagineTasks(taskIds, authHeader) {
     if (!taskIds || taskIds.length === 0) return;
     try {
-      await fetch('/v1/public/imagine/stop', {
+      await fetch('/v1/function/imagine/stop', {
         method: 'POST',
         headers: {
           ...buildAuthHeaders(authHeader),
@@ -611,7 +611,7 @@
 
   function buildSseUrl(taskId, index, rawPublicKey) {
     const httpProtocol = window.location.protocol === 'https:' ? 'https' : 'http';
-    const base = `${httpProtocol}://${window.location.host}/v1/public/imagine/sse`;
+    const base = `${httpProtocol}://${window.location.host}/v1/function/imagine/sse`;
     const params = new URLSearchParams();
     params.set('task_id', taskId);
     params.set('t', String(Date.now()));
@@ -619,7 +619,7 @@
       params.set('conn', String(index));
     }
     if (rawPublicKey) {
-      params.set('public_key', rawPublicKey);
+      params.set('function_key', rawPublicKey);
     }
     return `${base}?${params.toString()}`;
   }
@@ -668,7 +668,7 @@
       return;
     }
 
-    const authHeader = await ensurePublicKey();
+    const authHeader = await ensureFunctionKey();
     if (authHeader === null) {
       toast(t('common.configurePublicKey'), 'error');
       window.location.href = '/login';
@@ -733,9 +733,9 @@
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
       const params = new URLSearchParams({ task_id: taskIds[i] });
       if (rawPublicKey) {
-        params.set('public_key', rawPublicKey);
+        params.set('function_key', rawPublicKey);
       }
-      const wsUrl = `${protocol}://${window.location.host}/v1/public/imagine/ws?${params.toString()}`;
+      const wsUrl = `${protocol}://${window.location.host}/v1/function/imagine/ws?${params.toString()}`;
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -811,7 +811,7 @@
       pendingFallbackTimer = null;
     }
 
-    const authHeader = await ensurePublicKey();
+    const authHeader = await ensureFunctionKey();
     if (authHeader !== null && currentTaskIds.length > 0) {
       await stopImagineTasks(currentTaskIds, authHeader);
     }

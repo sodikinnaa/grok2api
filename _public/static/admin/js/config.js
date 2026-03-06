@@ -40,8 +40,8 @@ const LOCALE_MAP = {
     "label": "应用设置",
     "api_key": { title: "API 密钥", desc: "调用 Grok2API 服务的 Token（可选，支持多个，逗号分隔或数组）。" },
     "app_key": { title: "后台密码", desc: "登录 Grok2API 管理后台的密码（必填）。" },
-    "public_enabled": { title: "启用功能玩法", desc: "是否启用功能玩法入口（关闭则功能玩法页面不可访问）。" },
-    "public_key": { title: "Public 密码", desc: "功能玩法页面的访问密码（可选）。" },
+    "function_enabled": { title: "启用功能玩法", desc: "是否启用功能玩法入口（关闭则功能玩法页面不可访问）。" },
+    "function_key": { title: "Function 密码", desc: "功能玩法页面的访问密码（可选）。" },
     "app_url": { title: "应用地址", desc: "当前 Grok2API 服务的外部访问 URL，用于文件链接访问。" },
     "image_format": { title: "图片格式", desc: "默认生成的图片格式（url 或 base64）。" },
     "video_format": { title: "视频格式", desc: "默认生成的视频格式（html 或 url，url 为处理后的链接）。" },
@@ -506,7 +506,7 @@ function buildFieldCard(section, key, val) {
     built = buildJsonInput(section, key, val);
   }
   else {
-    if (key === 'api_key' || key === 'app_key' || key === 'public_key') {
+    if (key === 'api_key' || key === 'app_key' || key === 'function_key') {
       built = buildSecretInput(section, key, val);
     } else {
       built = buildTextInput(section, key, val);
@@ -527,7 +527,7 @@ function buildFieldCard(section, key, val) {
     });
   }
 
-  if (section === 'app' && key === 'public_enabled') {
+  if (section === 'app' && key === 'function_enabled') {
     fieldCard.classList.add('has-action');
     const link = document.createElement('a');
     link.href = '/login';

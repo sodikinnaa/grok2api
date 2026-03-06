@@ -8,7 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.core.auth import verify_public_key, get_public_api_key, is_public_enabled
+from app.core.auth import (
+    verify_function_key,
+    get_function_api_key,
+    is_function_enabled,
+)
 from app.core.config import get_config
 from app.core.logger import logger
 from app.api.v1.image import resolve_aspect_ratio
@@ -111,7 +115,7 @@ async def _drop_sessions(task_ids: List[str]) -> int:
 
 
 @router.websocket("/imagine/ws")
-async def public_imagine_ws(websocket: WebSocket):
+async def function_imagine_ws(websocket: WebSocket):
     session_id = None
     task_id = websocket.query_params.get("task_id")
     if task_id:
@@ -121,13 +125,13 @@ async def public_imagine_ws(websocket: WebSocket):
 
     ok = True
     if session_id is None:
-        public_key = get_public_api_key()
-        public_enabled = is_public_enabled()
-        if not public_key:
-            ok = public_enabled
+        function_key = get_function_api_key()
+        function_enabled = is_function_enabled()
+        if not function_key:
+            ok = function_enabled
         else:
-            key = websocket.query_params.get("public_key")
-            ok = key == public_key
+            key = websocket.query_params.get("function_key")
+            ok = key == function_key
 
     if not ok:
         await websocket.close(code=1008)
@@ -329,7 +333,7 @@ async def public_imagine_ws(websocket: WebSocket):
 
 
 @router.get("/imagine/sse")
-async def public_imagine_sse(
+async def function_imagine_sse(
     request: Request,
     task_id: str = Query(""),
     prompt: str = Query(""),
@@ -342,14 +346,14 @@ async def public_imagine_sse(
         if not session:
             raise HTTPException(status_code=404, detail="Task not found")
     else:
-        public_key = get_public_api_key()
-        public_enabled = is_public_enabled()
-        if not public_key:
-            if not public_enabled:
-                raise HTTPException(status_code=401, detail="Public access is disabled")
+        function_key = get_function_api_key()
+        function_enabled = is_function_enabled()
+        if not function_key:
+            if not function_enabled:
+                raise HTTPException(status_code=401, detail="Function access is disabled")
         else:
-            key = request.query_params.get("public_key")
-            if key != public_key:
+            key = request.query_params.get("function_key")
+            if key != function_key:
                 raise HTTPException(status_code=401, detail="Invalid authentication token")
 
     if session:
@@ -471,7 +475,7 @@ async def public_imagine_sse(
 
 
 @router.get("/imagine/config")
-async def public_imagine_config():
+async def function_imagine_config():
     return {
         "final_min_bytes": int(get_config("image.final_min_bytes") or 0),
         "medium_min_bytes": int(get_config("image.medium_min_bytes") or 0),
@@ -485,8 +489,8 @@ class ImagineStartRequest(BaseModel):
     nsfw: Optional[bool] = None
 
 
-@router.post("/imagine/start", dependencies=[Depends(verify_public_key)])
-async def public_imagine_start(data: ImagineStartRequest):
+@router.post("/imagine/start", dependencies=[Depends(verify_function_key)])
+async def function_imagine_start(data: ImagineStartRequest):
     prompt = (data.prompt or "").strip()
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
@@ -499,7 +503,7 @@ class ImagineStopRequest(BaseModel):
     task_ids: List[str]
 
 
-@router.post("/imagine/stop", dependencies=[Depends(verify_public_key)])
-async def public_imagine_stop(data: ImagineStopRequest):
+@router.post("/imagine/stop", dependencies=[Depends(verify_function_key)])
+async def function_imagine_stop(data: ImagineStopRequest):
     removed = await _drop_sessions(data.task_ids or [])
     return {"status": "success", "removed": removed}

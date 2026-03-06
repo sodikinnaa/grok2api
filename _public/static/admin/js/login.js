@@ -1,12 +1,12 @@
 const apiKeyInput = document.getElementById('api-key-input');
-const publicKeyInput = document.getElementById('public-key-input');
+const functionKeyInput = document.getElementById('function-key-input');
 if (apiKeyInput) {
   apiKeyInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') login();
   });
 }
-if (publicKeyInput) {
-  publicKeyInput.addEventListener('keypress', (e) => {
+if (functionKeyInput) {
+  functionKeyInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') login();
   });
 }
@@ -21,15 +21,15 @@ async function requestLogin(key) {
 
 async function login() {
   const input = (apiKeyInput ? apiKeyInput.value : '').trim();
-  const publicKey = (publicKeyInput ? publicKeyInput.value : '').trim();
+  const functionKey = (functionKeyInput ? functionKeyInput.value : '').trim();
   if (!input) return;
 
   try {
     const ok = await requestLogin(input);
     if (ok) {
       await storeAppKey(input);
-      if (publicKey) {
-        await storePublicKey(publicKey);
+      if (functionKey) {
+        await storeFunctionKey(functionKey);
       }
       window.location.href = '/admin/token';
     } else {

@@ -130,8 +130,8 @@
       "app": {
         "api_key": {"title": "API Key", "desc": "Token for calling Grok2API services (optional, supports multiple, comma-separated or array)."},
         "app_key": {"title": "Admin Password", "desc": "Password for logging into the Grok2API admin panel (required)."},
-        "public_enabled": {"title": "Enable Public Access", "desc": "Whether to enable the public access entry (disabled means public pages are inaccessible)."},
-        "public_key": {"title": "Public Password", "desc": "Access password for public pages (optional)."},
+        "function_enabled": {"title": "Enable Function Access", "desc": "Whether to enable the function access entry (disabled means function pages are inaccessible)."},
+        "function_key": {"title": "Function Password", "desc": "Access password for function pages (optional)."},
         "app_url": {"title": "App URL", "desc": "External access URL for the Grok2API service, used for file link access."},
         "image_format": {"title": "Image Format", "desc": "Default image format (url or base64)."},
         "video_format": {"title": "Video Format", "desc": "Default video format (html or url, url is the processed link)."},

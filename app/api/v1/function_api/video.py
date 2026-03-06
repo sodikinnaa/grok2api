@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.core.auth import verify_public_key
+from app.core.auth import verify_function_key
 from app.core.logger import logger
 from app.services.grok.services.video import VideoService
 from app.services.grok.services.model import ModelService
@@ -133,8 +133,8 @@ class VideoStartRequest(BaseModel):
     reasoning_effort: Optional[str] = None
 
 
-@router.post("/video/start", dependencies=[Depends(verify_public_key)])
-async def public_video_start(data: VideoStartRequest):
+@router.post("/video/start", dependencies=[Depends(verify_function_key)])
+async def function_video_start(data: VideoStartRequest):
     prompt = (data.prompt or "").strip()
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
@@ -192,7 +192,7 @@ async def public_video_start(data: VideoStartRequest):
 
 
 @router.get("/video/sse")
-async def public_video_sse(request: Request, task_id: str = Query("")):
+async def function_video_sse(request: Request, task_id: str = Query("")):
     session = await _get_session(task_id)
     if not session:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -247,7 +247,7 @@ async def public_video_sse(request: Request, task_id: str = Query("")):
                     break
                 yield chunk
         except Exception as e:
-            logger.warning(f"Public video SSE error: {e}")
+            logger.warning(f"Function video SSE error: {e}")
             payload = {"error": str(e), "code": "internal_error"}
             yield f"data: {orjson.dumps(payload).decode()}\n\n"
             yield "data: [DONE]\n\n"
@@ -265,8 +265,8 @@ class VideoStopRequest(BaseModel):
     task_ids: List[str]
 
 
-@router.post("/video/stop", dependencies=[Depends(verify_public_key)])
-async def public_video_stop(data: VideoStopRequest):
+@router.post("/video/stop", dependencies=[Depends(verify_function_key)])
+async def function_video_stop(data: VideoStopRequest):
     removed = await _drop_sessions(data.task_ids or [])
     return {"status": "success", "removed": removed}
 

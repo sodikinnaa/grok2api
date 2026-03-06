@@ -39,7 +39,7 @@
   let attachment = null;
   let activeStreamInfo = null;
   const feedbackUrl = 'https://github.com/chenyme/grok2api/issues/new';
-  const CHAT_COMPLETIONS_ENDPOINT = '/v1/public/chat/completions';
+  const CHAT_COMPLETIONS_ENDPOINT = '/v1/function/chat/completions';
   const DEFAULT_SESSION_TITLES = ['新会话', 'New Session'];
 
   let sessionsData = null;
@@ -987,7 +987,7 @@
     (async () => {
       let headers = { 'Content-Type': 'application/json' };
       try {
-        const authHeader = await ensurePublicKey();
+        const authHeader = await ensureFunctionKey();
         headers = { ...headers, ...buildAuthHeaders(authHeader) };
       } catch (e) {}
 
@@ -1496,7 +1496,7 @@
 
     let headers = { 'Content-Type': 'application/json' };
     try {
-      const authHeader = await ensurePublicKey();
+      const authHeader = await ensureFunctionKey();
       headers = { ...headers, ...buildAuthHeaders(authHeader) };
     } catch (e) {
       // ignore auth helper failures
@@ -1579,7 +1579,7 @@
 
     let headers = { 'Content-Type': 'application/json' };
     try {
-      const authHeader = await ensurePublicKey();
+      const authHeader = await ensureFunctionKey();
       headers = { ...headers, ...buildAuthHeaders(authHeader) };
     } catch (e) {
       // ignore auth helper failures
@@ -1822,7 +1822,7 @@
 
   (async () => {
     try {
-      const authResult = await ensurePublicKey();
+      const authResult = await ensureFunctionKey();
       if (authResult === null) {
         window.location.href = '/login';
         return;

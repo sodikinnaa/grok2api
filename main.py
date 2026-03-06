@@ -40,7 +40,7 @@ from app.api.v1.models import router as models_router  # noqa: E402
 from app.api.v1.response import router as responses_router  # noqa: E402
 from app.services.token import get_scheduler  # noqa: E402
 from app.api.v1.admin_api import router as admin_router
-from app.api.v1.public_api import router as public_router
+from app.api.v1.function_api import router as function_router
 from app.api.pages import router as pages_router
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -157,9 +157,9 @@ def create_app() -> FastAPI:
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-    # 注册管理与公共路由
+    # 注册管理与功能玩法路由
     app.include_router(admin_router, prefix="/v1/admin")
-    app.include_router(public_router, prefix="/v1/public")
+    app.include_router(function_router, prefix="/v1/function")
     app.include_router(pages_router)
 
     @app.get("/favicon.ico", include_in_schema=False)

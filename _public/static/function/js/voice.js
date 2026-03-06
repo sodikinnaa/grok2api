@@ -128,7 +128,7 @@
     }
 
     try {
-      const authHeader = await ensurePublicKey();
+      const authHeader = await ensureFunctionKey();
       if (authHeader === null) {
         toast(t('common.configurePublicKey'), 'error');
         window.location.href = '/login';
@@ -148,7 +148,7 @@
 
       const headers = buildAuthHeaders(authHeader);
 
-      const response = await fetch(`/v1/public/voice/token?${params.toString()}`, {
+      const response = await fetch(`/v1/function/voice/token?${params.toString()}`, {
         headers
       });
 

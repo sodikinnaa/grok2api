@@ -6,10 +6,10 @@ app_url = ""
 app_key = "grok2api"
 # API 调用密钥（可选，支持列表）
 api_key = ""
-# 是否启用 public 功能玩法
-public_enabled = false
-# Public 调用密钥（可选）
-public_key = ""
+# 是否启用 function 功能玩法
+function_enabled = false
+# function 调用密钥（可选）
+function_key = ""
 # 生成图片的格式（url 或 base64）
 image_format = "url"
 # 生成视频的格式（html 或 url）

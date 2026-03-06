@@ -1,15 +1,15 @@
-async function loadPublicHeader() {
+async function loadFunctionHeader() {
   const container = document.getElementById('app-header');
   if (!container) return;
   try {
-    const res = await fetch('/static/common/html/public-header.html?v=1.5.4');
+    const res = await fetch('/static/common/html/function-header.html?v=1.5.4');
     if (!res.ok) return;
     container.innerHTML = await res.text();
-    const logoutBtn = container.querySelector('#public-logout-btn');
+    const logoutBtn = container.querySelector('#function-logout-btn');
     if (logoutBtn) {
       logoutBtn.classList.add('hidden');
       try {
-        const verify = await fetch('/v1/public/verify', { method: 'GET' });
+        const verify = await fetch('/v1/function/verify', { method: 'GET' });
         if (verify.status === 401) {
           logoutBtn.classList.remove('hidden');
         }
@@ -36,7 +36,7 @@ async function loadPublicHeader() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', loadPublicHeader);
+  document.addEventListener('DOMContentLoaded', loadFunctionHeader);
 } else {
-  loadPublicHeader();
+  loadFunctionHeader();
 }

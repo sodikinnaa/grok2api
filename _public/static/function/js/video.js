@@ -248,12 +248,12 @@
 
   function buildSseUrl(taskId, rawPublicKey) {
     const httpProtocol = window.location.protocol === 'https:' ? 'https' : 'http';
-    const base = `${httpProtocol}://${window.location.host}/v1/public/video/sse`;
+    const base = `${httpProtocol}://${window.location.host}/v1/function/video/sse`;
     const params = new URLSearchParams();
     params.set('task_id', taskId);
     params.set('t', String(Date.now()));
     if (rawPublicKey) {
-      params.set('public_key', rawPublicKey);
+      params.set('function_key', rawPublicKey);
     }
     return `${base}?${params.toString()}`;
   }
@@ -266,7 +266,7 @@
       throw new Error('invalid_reference');
     }
     const imageUrl = fileDataUrl || rawUrl;
-    const res = await fetch('/v1/public/video/start', {
+    const res = await fetch('/v1/function/video/start', {
       method: 'POST',
       headers: {
         ...buildAuthHeaders(authHeader),
@@ -293,7 +293,7 @@
   async function stopVideoTask(taskId, authHeader) {
     if (!taskId) return;
     try {
-      await fetch('/v1/public/video/stop', {
+      await fetch('/v1/function/video/stop', {
         method: 'POST',
         headers: {
           ...buildAuthHeaders(authHeader),
@@ -428,7 +428,7 @@
       return;
     }
 
-    const authHeader = await ensurePublicKey();
+    const authHeader = await ensureFunctionKey();
     if (authHeader === null) {
       toast(t('common.configurePublicKey'), 'error');
       window.location.href = '/login';
@@ -505,7 +505,7 @@
   }
 
   async function stopConnection() {
-    const authHeader = await ensurePublicKey();
+    const authHeader = await ensureFunctionKey();
     if (authHeader !== null) {
       await stopVideoTask(currentTaskId, authHeader);
     }

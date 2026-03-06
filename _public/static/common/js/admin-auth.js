@@ -1,10 +1,10 @@
 const APP_KEY_STORAGE = 'grok2api_app_key';
-const PUBLIC_KEY_STORAGE = 'grok2api_public_key';
+const FUNCTION_KEY_STORAGE = 'grok2api_function_key';
 const APP_KEY_ENC_PREFIX = 'enc:v1:';
 const APP_KEY_XOR_PREFIX = 'enc:xor:';
 const APP_KEY_SECRET = 'grok2api-admin-key';
 let cachedAdminKey = null;
-let cachedPublicKey = null;
+let cachedFunctionKey = null;
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -114,13 +114,13 @@ async function getStoredAppKey() {
   }
 }
 
-async function getStoredPublicKey() {
-  const stored = localStorage.getItem(PUBLIC_KEY_STORAGE) || '';
+async function getStoredFunctionKey() {
+  const stored = localStorage.getItem(FUNCTION_KEY_STORAGE) || '';
   if (!stored) return '';
   try {
     return await decryptAppKey(stored);
   } catch (e) {
-    clearStoredPublicKey();
+    clearStoredFunctionKey();
     return '';
   }
 }
@@ -134,13 +134,13 @@ async function storeAppKey(appKey) {
   localStorage.setItem(APP_KEY_STORAGE, encrypted || '');
 }
 
-async function storePublicKey(publicKey) {
+async function storeFunctionKey(publicKey) {
   if (!publicKey) {
-    clearStoredPublicKey();
+    clearStoredFunctionKey();
     return;
   }
   const encrypted = await encryptAppKey(publicKey);
-  localStorage.setItem(PUBLIC_KEY_STORAGE, encrypted || '');
+  localStorage.setItem(FUNCTION_KEY_STORAGE, encrypted || '');
 }
 
 function clearStoredAppKey() {
@@ -148,9 +148,9 @@ function clearStoredAppKey() {
   cachedAdminKey = null;
 }
 
-function clearStoredPublicKey() {
-  localStorage.removeItem(PUBLIC_KEY_STORAGE);
-  cachedPublicKey = null;
+function clearStoredFunctionKey() {
+  localStorage.removeItem(FUNCTION_KEY_STORAGE);
+  cachedFunctionKey = null;
 }
 
 async function verifyKey(url, key) {
@@ -178,23 +178,23 @@ async function ensureAdminKey() {
   }
 }
 
-async function hashPublicKey(key) {
+async function hashFunctionKey(key) {
   if (!crypto?.subtle) return null;
-  const data = new TextEncoder().encode('grok2api-public:' + key);
+  const data = new TextEncoder().encode('grok2api-function:' + key);
   const buf = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function ensurePublicKey() {
-  if (cachedPublicKey !== null) return cachedPublicKey;
+async function ensureFunctionKey() {
+  if (cachedFunctionKey !== null) return cachedFunctionKey;
 
-  const key = await getStoredPublicKey();
+  const key = await getStoredFunctionKey();
   if (!key) {
     try {
-      const ok = await verifyKey('/v1/public/verify', '');
+      const ok = await verifyKey('/v1/function/verify', '');
       if (ok) {
-        cachedPublicKey = '';
-        return cachedPublicKey;
+        cachedFunctionKey = '';
+        return cachedFunctionKey;
       }
     } catch (e) {
       // ignore
@@ -203,13 +203,13 @@ async function ensurePublicKey() {
   }
 
   try {
-    const ok = await verifyKey('/v1/public/verify', key);
+    const ok = await verifyKey('/v1/function/verify', key);
     if (!ok) throw new Error('Unauthorized');
-    const hash = await hashPublicKey(key);
-    cachedPublicKey = hash ? `Bearer public-${hash}` : `Bearer ${key}`;
-    return cachedPublicKey;
+    const hash = await hashFunctionKey(key);
+    cachedFunctionKey = hash ? `Bearer function-${hash}` : `Bearer ${key}`;
+    return cachedFunctionKey;
   } catch (e) {
-    clearStoredPublicKey();
+    clearStoredFunctionKey();
     return null;
   }
 }
@@ -220,12 +220,12 @@ function buildAuthHeaders(apiKey) {
 
 function logout() {
   clearStoredAppKey();
-  clearStoredPublicKey();
+  clearStoredFunctionKey();
   window.location.href = '/admin/login';
 }
 
-function publicLogout() {
-  clearStoredPublicKey();
+function functionLogout() {
+  clearStoredFunctionKey();
   window.location.href = '/login';
 }
 

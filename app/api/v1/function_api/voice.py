@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.core.auth import verify_public_key
+from app.core.auth import verify_function_key
 from app.core.exceptions import AppException
 from app.services.grok.services.voice import VoiceService
 from app.services.token.manager import get_token_manager
@@ -18,10 +18,10 @@ class VoiceTokenResponse(BaseModel):
 
 @router.get(
     "/voice/token",
-    dependencies=[Depends(verify_public_key)],
+    dependencies=[Depends(verify_function_key)],
     response_model=VoiceTokenResponse,
 )
-async def public_voice_token(
+async def function_voice_token(
     voice: str = "ara",
     personality: str = "assistant",
     speed: float = 1.0,
@@ -74,7 +74,7 @@ async def public_voice_token(
         )
 
 
-@router.get("/verify", dependencies=[Depends(verify_public_key)])
-async def public_verify_api():
-    """验证 Public Key"""
+@router.get("/verify", dependencies=[Depends(verify_function_key)])
+async def function_verify_api():
+    """验证 Function Key"""
     return {"status": "success"}

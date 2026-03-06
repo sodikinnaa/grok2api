@@ -1,13 +1,13 @@
-const publicKeyInput = document.getElementById('public-key-input');
-if (publicKeyInput) {
-  publicKeyInput.addEventListener('keypress', (e) => {
+const functionKeyInput = document.getElementById('function-key-input');
+if (functionKeyInput) {
+  functionKeyInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') login();
   });
 }
 
-async function requestPublicLogin(key) {
+async function requestFunctionLogin(key) {
   const headers = key ? { 'Authorization': `Bearer ${key}` } : {};
-  const res = await fetch('/v1/public/verify', {
+  const res = await fetch('/v1/function/verify', {
     method: 'GET',
     headers
   });
@@ -15,11 +15,11 @@ async function requestPublicLogin(key) {
 }
 
 async function login() {
-  const input = (publicKeyInput ? publicKeyInput.value : '').trim();
+  const input = (functionKeyInput ? functionKeyInput.value : '').trim();
   try {
-    const ok = await requestPublicLogin(input);
+    const ok = await requestFunctionLogin(input);
     if (ok) {
-      await storePublicKey(input);
+      await storeFunctionKey(input);
       window.location.href = '/chat';
     } else {
       showToast(t('common.invalidKey'), 'error');
@@ -31,17 +31,17 @@ async function login() {
 
 (async () => {
   try {
-    const stored = await getStoredPublicKey();
+    const stored = await getStoredFunctionKey();
     if (stored) {
-      const ok = await requestPublicLogin(stored);
+      const ok = await requestFunctionLogin(stored);
       if (ok) {
         window.location.href = '/chat';
         return;
       }
-      clearStoredPublicKey();
+      clearStoredFunctionKey();
     }
 
-    const ok = await requestPublicLogin('');
+    const ok = await requestFunctionLogin('');
     if (ok) {
       window.location.href = '/chat';
     }
