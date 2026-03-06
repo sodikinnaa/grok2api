@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 
 router = APIRouter()
-STATIC_DIR = Path(__file__).resolve().parents[2] / "static"
+STATIC_DIR = Path(__file__).resolve().parents[3] / "_public" / "static"
 
 
 def _admin_page_response(relative_path: str) -> FileResponse:
