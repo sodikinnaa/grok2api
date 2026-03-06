@@ -41,7 +41,10 @@ FROM python:3.13-alpine
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     TZ=Asia/Shanghai \
-    VIRTUAL_ENV=/opt/venv
+    VIRTUAL_ENV=/opt/venv \
+    SERVER_HOST=0.0.0.0 \
+    SERVER_PORT=8000 \
+    SERVER_WORKERS=1
 
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
@@ -60,6 +63,7 @@ COPY --from=builder /opt/venv /opt/venv
 
 COPY config.defaults.toml ./
 COPY app ./app
+COPY _public ./_public
 COPY main.py ./
 COPY scripts ./scripts
 
