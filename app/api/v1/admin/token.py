@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 import orjson
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -13,6 +14,33 @@ from app.services.grok.batch_services.nsfw import NSFWService
 from app.services.token.manager import get_token_manager
 
 router = APIRouter()
+
+_TOKEN_CHAR_REPLACEMENTS = str.maketrans(
+    {
+        "\u2010": "-",
+        "\u2011": "-",
+        "\u2012": "-",
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2212": "-",
+        "\u00a0": " ",
+        "\u2007": " ",
+        "\u202f": " ",
+        "\u200b": "",
+        "\u200c": "",
+        "\u200d": "",
+        "\ufeff": "",
+    }
+)
+
+
+def _sanitize_token_text(value) -> str:
+    token = "" if value is None else str(value)
+    token = token.translate(_TOKEN_CHAR_REPLACEMENTS)
+    token = re.sub(r"\s+", "", token)
+    if token.startswith("sso="):
+        token = token[4:]
+    return token.encode("ascii", errors="ignore").decode("ascii")
 
 
 @router.get("/tokens", dependencies=[Depends(verify_app_key)])
@@ -47,8 +75,8 @@ async def update_tokens(data: dict):
                     else:
                         continue
                     raw_token = token_data.get("token")
-                    if isinstance(raw_token, str) and raw_token.startswith("sso="):
-                        token_data["token"] = raw_token[4:]
+                    if raw_token is not None:
+                        token_data["token"] = _sanitize_token_text(raw_token)
                     token_key = token_data.get("token")
                     if isinstance(token_key, str):
                         pool_map[token_key] = token_data
@@ -66,8 +94,11 @@ async def update_tokens(data: dict):
                         continue
 
                     raw_token = token_data.get("token")
-                    if isinstance(raw_token, str) and raw_token.startswith("sso="):
-                        token_data["token"] = raw_token[4:]
+                    if raw_token is not None:
+                        token_data["token"] = _sanitize_token_text(raw_token)
+                    if not token_data.get("token"):
+                        logger.warning(f"Skip empty token in pool '{pool_name}'")
+                        continue
 
                     base = existing_map.get(pool_name, {}).get(
                         token_data.get("token"), {}

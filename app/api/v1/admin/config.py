@@ -1,12 +1,84 @@
 import os
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.auth import verify_app_key
 from app.core.config import config
 from app.core.storage import get_storage as resolve_storage, LocalStorage, RedisStorage, SQLStorage
+from app.core.logger import logger
 
 router = APIRouter()
+
+_CFG_CHAR_REPLACEMENTS = str.maketrans(
+    {
+        "\u2010": "-",
+        "\u2011": "-",
+        "\u2012": "-",
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2212": "-",
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u00a0": " ",
+        "\u2007": " ",
+        "\u202f": " ",
+        "\u200b": "",
+        "\u200c": "",
+        "\u200d": "",
+        "\ufeff": "",
+    }
+)
+
+
+def _sanitize_proxy_text(value, *, remove_all_spaces: bool = False) -> str:
+    text = "" if value is None else str(value)
+    text = text.translate(_CFG_CHAR_REPLACEMENTS)
+    if remove_all_spaces:
+        text = re.sub(r"\s+", "", text)
+    else:
+        text = text.strip()
+    return text.encode("latin-1", errors="ignore").decode("latin-1")
+
+
+def _sanitize_proxy_config_payload(data: dict) -> dict:
+    if not isinstance(data, dict):
+        return data
+    payload = dict(data)
+    proxy = payload.get("proxy")
+    if not isinstance(proxy, dict):
+        return payload
+
+    sanitized_proxy = dict(proxy)
+    changed = False
+
+    if "user_agent" in sanitized_proxy:
+        raw = sanitized_proxy.get("user_agent")
+        val = _sanitize_proxy_text(raw, remove_all_spaces=False)
+        if val != raw:
+            sanitized_proxy["user_agent"] = val
+            changed = True
+
+    if "cf_cookies" in sanitized_proxy:
+        raw = sanitized_proxy.get("cf_cookies")
+        val = _sanitize_proxy_text(raw, remove_all_spaces=False)
+        if val != raw:
+            sanitized_proxy["cf_cookies"] = val
+            changed = True
+
+    if "cf_clearance" in sanitized_proxy:
+        raw = sanitized_proxy.get("cf_clearance")
+        val = _sanitize_proxy_text(raw, remove_all_spaces=True)
+        if val != raw:
+            sanitized_proxy["cf_clearance"] = val
+            changed = True
+
+    if changed:
+        logger.warning("Sanitized proxy config fields before saving")
+        payload["proxy"] = sanitized_proxy
+    return payload
 
 
 @router.get("/verify", dependencies=[Depends(verify_app_key)])
@@ -26,7 +98,7 @@ async def get_config():
 async def update_config(data: dict):
     """更新配置"""
     try:
-        await config.update(data)
+        await config.update(_sanitize_proxy_config_payload(data))
         return {"status": "success", "message": "配置已更新"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
