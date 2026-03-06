@@ -178,13 +178,6 @@ async function ensureAdminKey() {
   }
 }
 
-async function hashFunctionKey(key) {
-  if (!crypto?.subtle) return null;
-  const data = new TextEncoder().encode('grok2api-function:' + key);
-  const buf = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 async function ensureFunctionKey() {
   if (cachedFunctionKey !== null) return cachedFunctionKey;
 
@@ -205,8 +198,7 @@ async function ensureFunctionKey() {
   try {
     const ok = await verifyKey('/v1/function/verify', key);
     if (!ok) throw new Error('Unauthorized');
-    const hash = await hashFunctionKey(key);
-    cachedFunctionKey = hash ? `Bearer function-${hash}` : `Bearer ${key}`;
+    cachedFunctionKey = `Bearer ${key}`;
     return cachedFunctionKey;
   } catch (e) {
     clearStoredFunctionKey();

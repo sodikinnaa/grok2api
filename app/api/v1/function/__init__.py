@@ -3,9 +3,9 @@
 from fastapi import APIRouter, Depends
 
 from app.api.v1.chat import router as chat_router
-from app.api.v1.function_api.imagine import router as imagine_router
-from app.api.v1.function_api.video import router as video_router
-from app.api.v1.function_api.voice import router as voice_router
+from app.api.v1.function.imagine import router as imagine_router
+from app.api.v1.function.video import router as video_router
+from app.api.v1.function.voice import router as voice_router
 from app.core.auth import verify_function_key
 
 router = APIRouter()

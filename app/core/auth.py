@@ -2,7 +2,7 @@
 API 认证模块
 """
 
-import hashlib
+import hmac
 from typing import Optional, Iterable
 from fastapi import HTTPException, status, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -76,11 +76,6 @@ def is_function_enabled() -> bool:
     return bool(get_config("app.function_enabled", DEFAULT_FUNCTION_ENABLED))
 
 
-def _hash_function_key(key: str) -> str:
-    """计算 function_key 的 SHA-256 哈希。"""
-    return hashlib.sha256(f"grok2api-function:{key}".encode()).hexdigest()
-
-
 def _match_function_key(credentials: str, function_key: str) -> bool:
     """检查凭证是否匹配 function_key。"""
     if not function_key:
@@ -88,13 +83,8 @@ def _match_function_key(credentials: str, function_key: str) -> bool:
     normalized = function_key.strip()
     if not normalized:
         return False
-    if credentials == normalized:
-        return True
-    if credentials.startswith("function-"):
-        expected_hash = _hash_function_key(normalized)
-        if credentials == f"function-{expected_hash}":
-            return True
-    return False
+    # 常量时间比较，避免基于时序的探测
+    return hmac.compare_digest(credentials, normalized)
 
 
 async def verify_api_key(
@@ -118,8 +108,9 @@ async def verify_api_key(
         )
 
     # 标准 api_key 验证
-    if auth.credentials in api_keys:
-        return auth.credentials
+    for key in api_keys:
+        if hmac.compare_digest(auth.credentials, key):
+            return auth.credentials
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -152,7 +143,7 @@ async def verify_app_key(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if auth.credentials != app_key:
+    if not hmac.compare_digest(auth.credentials, app_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token",
