@@ -91,12 +91,18 @@ class AuthenticationException(AppException):
 class UpstreamException(AppException):
     """上游服务错误"""
 
-    def __init__(self, message: str, details: Any = None):
+    def __init__(
+        self,
+        message: str,
+        details: Any = None,
+        status_code: int = 502,
+        code: str = "upstream_error",
+    ):
         super().__init__(
             message=message,
             error_type=ErrorType.SERVER.value,
-            code="upstream_error",
-            status_code=502,
+            code=code,
+            status_code=status_code,
         )
         self.details = details
 

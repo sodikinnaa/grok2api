@@ -94,7 +94,8 @@ const LOCALE_MAP = {
     "label": "视频配置",
     "concurrent": { title: "并发上限", desc: "Reverse 接口并发上限。" },
     "timeout": { title: "请求超时", desc: "Reverse 接口超时时间（秒）。" },
-    "stream_timeout": { title: "流空闲超时", desc: "流式空闲超时时间（秒）。" }
+    "stream_timeout": { title: "流空闲超时", desc: "流式空闲超时时间（秒）。" },
+    "upscale_timing": { title: "超分时机", desc: "Basic 号池 720p 超分模式：single 为每轮扩展后超分，complete 为全部扩展后再超分。" }
   },
 
 
@@ -484,6 +485,12 @@ function buildFieldCard(section, key, val) {
     built = buildSelectInput(section, key, val, [
       { val: 'html', text: 'HTML' },
       { val: 'url', text: 'URL' }
+    ]);
+  }
+  else if (section === 'video' && key === 'upscale_timing') {
+    built = buildSelectInput(section, key, val, [
+      { val: 'single', text: 'single' },
+      { val: 'complete', text: 'complete' }
     ]);
   }
   else if (section === 'imagine_fast' && key === 'size') {
