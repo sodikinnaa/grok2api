@@ -395,6 +395,31 @@
     }
 
     progressBuffer += text;
+    const roundMatches = [...progressBuffer.matchAll(/\[round=(\d+)\/(\d+)\]\s*progress=([0-9]+(?:\.[0-9]+)?)%/g)];
+    if (roundMatches.length) {
+      const last = roundMatches[roundMatches.length - 1];
+      const round = parseInt(last[1], 10);
+      const total = parseInt(last[2], 10);
+      const value = parseFloat(last[3]);
+      setIndeterminate(false);
+      updateProgress(value);
+      if (progressText && Number.isFinite(round) && Number.isFinite(total) && total > 0) {
+        progressText.textContent = `${Math.round(value)}% · ${round}/${total}`;
+      }
+      progressBuffer = progressBuffer.slice(Math.max(0, progressBuffer.length - 300));
+      return;
+    }
+
+    const genericProgressMatches = [...progressBuffer.matchAll(/progress=([0-9]+(?:\.[0-9]+)?)%/g)];
+    if (genericProgressMatches.length) {
+      const last = genericProgressMatches[genericProgressMatches.length - 1];
+      const value = parseFloat(last[1]);
+      setIndeterminate(false);
+      updateProgress(value);
+      progressBuffer = progressBuffer.slice(Math.max(0, progressBuffer.length - 240));
+      return;
+    }
+
     const matches = [...progressBuffer.matchAll(/进度\s*(\d+)%/g)];
     if (matches.length) {
       const last = matches[matches.length - 1];

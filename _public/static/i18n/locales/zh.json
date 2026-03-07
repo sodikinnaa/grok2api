@@ -24,6 +24,7 @@
     "waitTaskFinish": "请等待当前任务结束",
     "pause": "暂停",
     "stop": "终止",
+    "selectAll": "全选",
     "selected": "已选择",
     "items": "项",
     "export": "导出",
@@ -172,7 +173,8 @@
       "video": {
         "concurrent": {"title": "并发上限", "desc": "Reverse 接口并发上限。"},
         "timeout": {"title": "请求超时", "desc": "Reverse 接口超时时间（秒）。"},
-        "stream_timeout": {"title": "流空闲超时", "desc": "流式空闲超时时间（秒）。"}
+        "stream_timeout": {"title": "流空闲超时", "desc": "流式空闲超时时间（秒）。"},
+        "upscale_timing": {"title": "超分时机", "desc": "Basic 号池 720p 超分模式：single 为每轮扩展后超分，complete 为全部扩展完成后再超分。"}
       },
       "image": {
         "timeout": {"title": "请求超时", "desc": "WebSocket 请求超时时间（秒）。"},
@@ -333,6 +335,14 @@
     "tableType": "类型",
     "tableAssetCount": "资产数",
     "tableLastClear": "上次清空时间",
+    "selectPage": "全选本页",
+    "selectAllFiles": "全选全部",
+    "clearSelection": "取消全选",
+    "prevPage": "上一页",
+    "nextPage": "下一页",
+    "perPageLabel": "每页",
+    "perPage": "{size} / 页",
+    "pagination": "第 {current} / {total} 页 · 共 {count} 条",
     "notLoaded": "未加载",
     "noAccounts": "暂无可用账号",
     "noFiles": "暂无文件",

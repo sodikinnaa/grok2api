@@ -9,8 +9,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/geist@1.0.0/dist/fonts/geist-sans/style.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/geist@1.0.0/dist/fonts/geist-mono/style.css" rel="stylesheet">
-  <link href="/static/common/css/common.css?v=1.6.0" rel="stylesheet">
-  <link href="/static/admin/css/token.css?v=1.6.0" rel="stylesheet">
+  <link href="/static/common/css/common.css?v=1.6.1" rel="stylesheet">
+  <link href="/static/admin/css/token.css?v=1.6.1" rel="stylesheet">
   <link href="/static/common/css/toast.css" rel="stylesheet">
 </head>
 
@@ -119,48 +119,67 @@
         </button>
       </div>
 
-      <!-- Token Table -->
-      <div class="rounded-lg overflow-hidden bg-white mb-4 overflow-x-auto">
-        <table class="geist-table min-w-[800px]">
-          <thead>
-            <tr>
-              <th class="w-10"><input type="checkbox" id="select-all" class="checkbox" onclick="toggleSelectAll()"></th>
-              <th class="w-48 text-left" data-i18n="token.tableToken">Token</th>
-              <th class="w-24" data-i18n="token.tableType">类型</th>
-              <th class="w-24" data-i18n="token.tableStatus">状态</th>
-              <th class="w-20" data-i18n="token.tableQuota">额度</th>
-              <th class="text-left" data-i18n="token.tableNote">备注</th>
-              <th class="w-44 text-center" data-i18n="token.tableActions">操作</th>
-            </tr>
-          </thead>
-          <tbody id="token-table-body">
-            <!-- Dynamic Rows -->
-          </tbody>
-        </table>
+      <div class="token-table-shell rounded-lg overflow-hidden bg-white mb-4">
+        <!-- Pagination -->
+        <div class="pagination-bar">
+          <div class="pagination-left">
+            <button id="page-prev" type="button" class="pagination-icon-btn" onclick="goPrevPage()" aria-label="上一页">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <div id="pagination-info" class="pagination-info">第 0 / 0 页 · 共 0 条</div>
+            <button id="page-next" type="button" class="pagination-icon-btn" onclick="goNextPage()" aria-label="下一页">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </div>
+          <div class="pagination-right">
+            <div id="select-all-wrap" class="select-menu-wrap">
+              <button id="select-all-trigger" type="button" class="pagination-action-btn" onclick="handleSelectAllPrimary(event)">
+                <span id="select-all-label" data-i18n="common.selectAll">全选</span>
+                <svg id="select-all-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              <div id="select-all-popover" class="select-all-popover hidden">
+                <button type="button" class="select-all-option" onclick="selectVisibleAllFromMenu()" data-i18n="token.selectPage">全选本页</button>
+                <button type="button" class="select-all-option" onclick="selectAllFilteredFromMenu()" data-i18n="token.selectAllFiltered">全选全部</button>
+              </div>
+            </div>
+            <select id="page-size" class="pagination-size-select" onchange="changePageSize()">
+              <option value="20">20 / 页</option>
+              <option value="50" selected>50 / 页</option>
+              <option value="100">100 / 页</option>
+              <option value="200">200 / 页</option>
+              <option value="500">500 / 页</option>
+              <option value="1000">1000 / 页</option>
+              <option value="2000">2000 / 页</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="geist-table min-w-[860px]">
+            <thead>
+              <tr>
+                <th class="w-10"><input type="checkbox" id="select-all" class="checkbox" onclick="toggleSelectAll()"></th>
+                <th class="w-56 text-left" data-i18n="token.tableToken">Token</th>
+                <th class="w-24" data-i18n="token.tableType">类型</th>
+                <th class="w-24" data-i18n="token.tableStatus">状态</th>
+                <th class="w-20" data-i18n="token.tableQuota">额度</th>
+                <th class="text-left" data-i18n="token.tableNote">备注</th>
+                <th class="w-44 text-center" data-i18n="token.tableActions">操作</th>
+              </tr>
+            </thead>
+            <tbody id="token-table-body">
+              <!-- Dynamic Rows -->
+            </tbody>
+          </table>
+        </div>
         <div id="loading" class="text-center py-12 text-[var(--accents-4)]" data-i18n="common.loading">加载中...</div>
         <div id="empty-state" class="hidden table-empty" data-i18n="token.emptyState">
           暂无 Token，请点击右上角导入或添加。
-        </div>
-      </div>
-
-      <!-- Pagination -->
-      <div class="pagination-bar">
-        <div id="pagination-info" class="text-xs text-[var(--accents-5)]">第 0 / 0 页 · 共 0 条</div>
-        <div class="flex items-center gap-2">
-          <button class="geist-button-outline text-xs px-3" onclick="selectVisibleAll()" data-i18n="token.selectPage">全选本页</button>
-          <button class="geist-button-outline text-xs px-3" onclick="selectAllFiltered()" data-i18n="token.selectAllFiltered">全选全部</button>
-          <button class="geist-button-outline text-xs px-3" onclick="clearAllSelection()" data-i18n="token.clearSelection">取消全选</button>
-          <button id="page-prev" class="geist-button-outline text-xs px-3" onclick="goPrevPage()" data-i18n="token.prevPage">上一页</button>
-          <button id="page-next" class="geist-button-outline text-xs px-3" onclick="goNextPage()" data-i18n="token.nextPage">下一页</button>
-          <select id="page-size" class="geist-input h-[30px]" onchange="changePageSize()">
-            <option value="20">20 / 页</option>
-            <option value="50" selected>50 / 页</option>
-            <option value="100">100 / 页</option>
-            <option value="200">200 / 页</option>
-            <option value="500">500 / 页</option>
-            <option value="1000">1000 / 页</option>
-            <option value="2000">2000 / 页</option>
-          </select>
         </div>
       </div>
 
@@ -304,12 +323,12 @@
 
   <script src="/static/common/js/draggable.js"></script>
   <script src="/static/i18n/i18n.js"></script>
-  <script src="/static/common/js/admin-auth.js?v=1.6.0"></script>
-  <script src="/static/common/js/batch-sse.js?v=1.6.0"></script>
-  <script src="/static/common/js/header.js?v=1.6.0"></script>
-  <script src="/static/common/js/footer.js?v=1.6.0"></script>
+  <script src="/static/common/js/admin-auth.js?v=1.6.1"></script>
+  <script src="/static/common/js/batch-sse.js?v=1.6.1"></script>
+  <script src="/static/common/js/header.js?v=1.6.1"></script>
+  <script src="/static/common/js/footer.js?v=1.6.1"></script>
   <script src="/static/common/js/toast.js"></script>
-  <script src="/static/admin/js/token.js?v=1.6.0"></script>
+  <script src="/static/admin/js/token.js?v=1.6.1"></script>
 </body>
 
 </html>

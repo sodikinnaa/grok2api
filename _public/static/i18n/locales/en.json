@@ -24,6 +24,7 @@
     "waitTaskFinish": "Please wait for the current task to finish",
     "pause": "Pause",
     "stop": "Stop",
+    "selectAll": "Select all",
     "selected": "Selected",
     "items": "items",
     "export": "Export",
@@ -172,7 +173,8 @@
       "video": {
         "concurrent": {"title": "Concurrency Limit", "desc": "Reverse API concurrency limit."},
         "timeout": {"title": "Request Timeout", "desc": "Reverse API timeout (seconds)."},
-        "stream_timeout": {"title": "Stream Idle Timeout", "desc": "Streaming idle timeout (seconds)."}
+        "stream_timeout": {"title": "Stream Idle Timeout", "desc": "Streaming idle timeout (seconds)."},
+        "upscale_timing": {"title": "Upscale Timing", "desc": "Basic pool 720p upscale mode: single upscales after each extension round, complete upscales once after all rounds."}
       },
       "image": {
         "timeout": {"title": "Request Timeout", "desc": "WebSocket request timeout (seconds)."},
@@ -333,6 +335,14 @@
     "tableType": "Type",
     "tableAssetCount": "Asset Count",
     "tableLastClear": "Last Cleared",
+    "selectPage": "Select page",
+    "selectAllFiles": "Select all",
+    "clearSelection": "Clear selection",
+    "prevPage": "Prev",
+    "nextPage": "Next",
+    "perPageLabel": "Per page",
+    "perPage": "{size} / page",
+    "pagination": "Page {current} / {total} · {count} items",
     "notLoaded": "Not loaded",
     "noAccounts": "No accounts available",
     "noFiles": "No files",
