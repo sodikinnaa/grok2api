@@ -87,17 +87,6 @@ class ModelService:
             is_video=False,
         ),
         ModelInfo(
-            model_id="grok-4-mini",
-            grok_model="grok-4-mini",
-            model_mode="MODEL_MODE_GROK_4_MINI_THINKING",
-            tier=Tier.BASIC,
-            cost=Cost.LOW,
-            display_name="GROK-4-MINI",
-            is_image=False,
-            is_image_edit=False,
-            is_video=False,
-        ),
-        ModelInfo(
             model_id="grok-4-thinking",
             grok_model="grok-4",
             model_mode="MODEL_MODE_GROK_4_THINKING",
