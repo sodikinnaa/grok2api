@@ -111,6 +111,8 @@ async function init() {
   if (apiKey === null) return;
   setupEditPoolDefaults();
   setupConfirmDialog();
+  setupSelectAllMenu();
+  refreshPageSizeOptionsI18n();
   loadData();
 }
 
@@ -351,12 +353,66 @@ function toggleSelectAll() {
   updateSelectionState();
 }
 
+function closeSelectAllMenu() {
+  const popover = byId('select-all-popover');
+  if (popover) popover.classList.add('hidden');
+}
+
+function openSelectAllMenu() {
+  const popover = byId('select-all-popover');
+  if (popover) popover.classList.remove('hidden');
+}
+
+function isSelectAllMenuOpen() {
+  const popover = byId('select-all-popover');
+  return !!(popover && !popover.classList.contains('hidden'));
+}
+
+function setupSelectAllMenu() {
+  document.addEventListener('click', (event) => {
+    const wrap = byId('select-all-wrap');
+    if (!wrap) return;
+    if (wrap.contains(event.target)) return;
+    closeSelectAllMenu();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeSelectAllMenu();
+    }
+  });
+}
+
+function handleSelectAllPrimary(event) {
+  if (event) event.stopPropagation();
+  const selected = countSelected(flatTokens);
+  if (selected > 0) {
+    clearAllSelection();
+    return;
+  }
+  if (isSelectAllMenuOpen()) {
+    closeSelectAllMenu();
+  } else {
+    openSelectAllMenu();
+  }
+}
+
+function selectVisibleAllFromMenu() {
+  selectVisibleAll();
+  closeSelectAllMenu();
+}
+
+function selectAllFilteredFromMenu() {
+  selectAllFiltered();
+  closeSelectAllMenu();
+}
+
 function selectAllFiltered() {
   const filtered = getFilteredTokens();
   if (filtered.length === 0) return;
   setSelectedForTokens(filtered, true);
   syncVisibleSelectionUI(true);
   updateSelectionState();
+  closeSelectAllMenu();
 }
 
 function selectVisibleAll() {
@@ -365,6 +421,7 @@ function selectVisibleAll() {
   setSelectedForTokens(visible, true);
   syncVisibleSelectionUI(true);
   updateSelectionState();
+  closeSelectAllMenu();
 }
 
 function clearAllSelection() {
@@ -372,6 +429,7 @@ function clearAllSelection() {
   setSelectedForTokens(flatTokens, false);
   syncVisibleSelectionUI(false);
   updateSelectionState();
+  closeSelectAllMenu();
 }
 
 function toggleSelect(index) {
@@ -394,6 +452,23 @@ function updateSelectionState() {
   }
   const selectedCountEl = byId('selected-count');
   if (selectedCountEl) selectedCountEl.innerText = selectedCount;
+  const selectAllLabel = byId('select-all-label');
+  const selectAllTrigger = byId('select-all-trigger');
+  const selectAllCaret = byId('select-all-caret');
+  if (selectAllLabel) {
+    selectAllLabel.textContent = selectedCount > 0
+      ? t('token.clearSelection')
+      : t('common.selectAll');
+  }
+  if (selectAllTrigger) {
+    selectAllTrigger.classList.toggle('is-active', selectedCount > 0);
+  }
+  if (selectAllCaret) {
+    selectAllCaret.style.display = selectedCount > 0 ? 'none' : 'inline';
+  }
+  if (selectedCount > 0) {
+    closeSelectAllMenu();
+  }
   setActionButtonsState(selectedCount);
 }
 
@@ -999,6 +1074,7 @@ function escapeHtml(text) {
 function filterByStatus(status) {
   currentFilter = status;
   currentPage = 1;
+  closeSelectAllMenu();
 
   // 更新 Tab 样式和 ARIA
   document.querySelectorAll('.tab-item').forEach(tab => {
@@ -1043,11 +1119,23 @@ function getVisibleTokens() {
   return getPaginationData().visibleTokens;
 }
 
+function refreshPageSizeOptionsI18n() {
+  const sizeSelect = byId('page-size');
+  if (!sizeSelect) return;
+  Array.from(sizeSelect.options).forEach((opt) => {
+    const size = parseInt(opt.value, 10);
+    if (!Number.isFinite(size)) return;
+    opt.textContent = t('token.perPage', { size });
+  });
+}
+
 function updatePaginationControls(totalCount, totalPages) {
   const info = byId('pagination-info');
   const prevBtn = byId('page-prev');
   const nextBtn = byId('page-next');
   const sizeSelect = byId('page-size');
+
+  refreshPageSizeOptionsI18n();
 
   if (sizeSelect && String(sizeSelect.value) !== String(pageSize)) {
     sizeSelect.value = String(pageSize);
@@ -1063,6 +1151,7 @@ function updatePaginationControls(totalCount, totalPages) {
 function goPrevPage() {
   if (currentPage <= 1) return;
   currentPage -= 1;
+  closeSelectAllMenu();
   renderTable();
 }
 
@@ -1071,6 +1160,7 @@ function goNextPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   if (currentPage >= totalPages) return;
   currentPage += 1;
+  closeSelectAllMenu();
   renderTable();
 }
 
@@ -1080,6 +1170,7 @@ function changePageSize() {
   if (!value || value === pageSize) return;
   pageSize = value;
   currentPage = 1;
+  closeSelectAllMenu();
   renderTable();
 }
 

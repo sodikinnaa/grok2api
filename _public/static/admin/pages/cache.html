@@ -9,8 +9,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/geist@1.0.0/dist/fonts/geist-sans/style.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/geist@1.0.0/dist/fonts/geist-mono/style.css" rel="stylesheet">
-  <link href="/static/common/css/common.css?v=1.6.0" rel="stylesheet">
-  <link href="/static/admin/css/cache.css?v=1.6.0" rel="stylesheet">
+  <link href="/static/common/css/common.css?v=1.6.1" rel="stylesheet">
+  <link href="/static/admin/css/cache.css?v=1.6.1" rel="stylesheet">
   <link href="/static/common/css/toast.css" rel="stylesheet">
 </head>
 
@@ -88,39 +88,99 @@
 
       <div id="local-cache-lists" class="space-y-4 hidden">
         <div id="local-image-list" class="cache-list hidden">
-          <div class="rounded-lg overflow-hidden bg-white overflow-x-auto">
-            <table class="geist-table min-w-[600px]">
-              <thead>
-                <tr>
-                  <th class="w-10 text-center">
-                    <input id="local-image-select-all" type="checkbox" class="checkbox" onchange="toggleLocalSelectAll('image', this)">
-                  </th>
-                  <th class="w-108 text-left" data-i18n="cache.tableFile">文件</th>
-                  <th class="w-32 text-left" data-i18n="cache.tableSize">大小</th>
-                  <th class="w-48 text-left" data-i18n="cache.tableTime">时间</th>
-                  <th class="w-24 text-center" data-i18n="cache.tableActions">操作</th>
-                </tr>
-              </thead>
-              <tbody id="local-image-body"></tbody>
-            </table>
+          <div class="cache-table-shell">
+            <div class="cache-pagination">
+              <div class="cache-pagination-left">
+                <button id="local-image-prev" type="button" class="cache-pagination-icon-btn" aria-label="上一页">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                <div id="local-image-page-info" class="cache-pagination-info"></div>
+                <button id="local-image-next" type="button" class="cache-pagination-icon-btn" aria-label="下一页">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+              </div>
+              <div class="cache-pagination-right">
+                <div id="local-image-select-wrap" class="cache-select-menu-wrap">
+                  <button id="local-image-select-trigger" type="button" class="cache-pagination-action-btn">
+                    <span id="local-image-select-label" data-i18n="common.selectAll">全选</span>
+                    <svg id="local-image-select-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+                  <div id="local-image-select-popover" class="cache-select-all-popover hidden">
+                    <button id="local-image-select-page" type="button" class="cache-select-all-option" data-i18n="cache.selectPage">全选本页</button>
+                    <button id="local-image-select-all" type="button" class="cache-select-all-option" data-i18n="cache.selectAllFiles">全选全部</button>
+                  </div>
+                </div>
+                <select id="local-image-page-size" class="cache-pagination-select"></select>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="geist-table min-w-[600px]">
+                <thead>
+                  <tr>
+                    <th class="w-10 text-center"></th>
+                    <th class="w-108 text-left" data-i18n="cache.tableFile">文件</th>
+                    <th class="w-32 text-left" data-i18n="cache.tableSize">大小</th>
+                    <th class="w-48 text-left" data-i18n="cache.tableTime">时间</th>
+                    <th class="w-24 text-center" data-i18n="cache.tableActions">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="local-image-body"></tbody>
+              </table>
+            </div>
           </div>
         </div>
         <div id="local-video-list" class="cache-list hidden">
-          <div class="rounded-lg overflow-hidden bg-white overflow-x-auto">
-            <table class="geist-table min-w-[600px]">
-              <thead>
-                <tr>
-                  <th class="w-10 text-center">
-                    <input id="local-video-select-all" type="checkbox" class="checkbox" onchange="toggleLocalSelectAll('video', this)">
-                  </th>
-                  <th class="w-108 text-left" data-i18n="cache.tableFile">文件</th>
-                  <th class="w-32 text-left" data-i18n="cache.tableSize">大小</th>
-                  <th class="w-48 text-left" data-i18n="cache.tableTime">时间</th>
-                  <th class="w-24 text-center" data-i18n="cache.tableActions">操作</th>
-                </tr>
-              </thead>
-              <tbody id="local-video-body"></tbody>
-            </table>
+          <div class="cache-table-shell">
+            <div class="cache-pagination">
+              <div class="cache-pagination-left">
+                <button id="local-video-prev" type="button" class="cache-pagination-icon-btn" aria-label="上一页">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+                <div id="local-video-page-info" class="cache-pagination-info"></div>
+                <button id="local-video-next" type="button" class="cache-pagination-icon-btn" aria-label="下一页">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+              </div>
+              <div class="cache-pagination-right">
+                <div id="local-video-select-wrap" class="cache-select-menu-wrap">
+                  <button id="local-video-select-trigger" type="button" class="cache-pagination-action-btn">
+                    <span id="local-video-select-label" data-i18n="common.selectAll">全选</span>
+                    <svg id="local-video-select-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+                  <div id="local-video-select-popover" class="cache-select-all-popover hidden">
+                    <button id="local-video-select-page" type="button" class="cache-select-all-option" data-i18n="cache.selectPage">全选本页</button>
+                    <button id="local-video-select-all" type="button" class="cache-select-all-option" data-i18n="cache.selectAllFiles">全选全部</button>
+                  </div>
+                </div>
+                <select id="local-video-page-size" class="cache-pagination-select"></select>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="geist-table min-w-[600px]">
+                <thead>
+                  <tr>
+                    <th class="w-10 text-center"></th>
+                    <th class="w-108 text-left" data-i18n="cache.tableFile">文件</th>
+                    <th class="w-32 text-left" data-i18n="cache.tableSize">大小</th>
+                    <th class="w-48 text-left" data-i18n="cache.tableTime">时间</th>
+                    <th class="w-24 text-center" data-i18n="cache.tableActions">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="local-video-body"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -197,12 +257,12 @@
   </dialog>
 
   <script src="/static/i18n/i18n.js"></script>
-  <script src="/static/common/js/admin-auth.js?v=1.6.0"></script>
-  <script src="/static/common/js/batch-sse.js?v=1.6.0"></script>
-  <script src="/static/common/js/header.js?v=1.6.0"></script>
-  <script src="/static/common/js/footer.js?v=1.6.0"></script>
+  <script src="/static/common/js/admin-auth.js?v=1.6.1"></script>
+  <script src="/static/common/js/batch-sse.js?v=1.6.1"></script>
+  <script src="/static/common/js/header.js?v=1.6.1"></script>
+  <script src="/static/common/js/footer.js?v=1.6.1"></script>
   <script src="/static/common/js/toast.js"></script>
-  <script src="/static/admin/js/cache.js?v=1.6.0"></script>
+  <script src="/static/admin/js/cache.js?v=1.6.1"></script>
   <script src="/static/common/js/draggable.js"></script>
 </body>
 

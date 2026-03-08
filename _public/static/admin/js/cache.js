@@ -8,6 +8,8 @@ const selectedLocal = {
   image: new Set(),
   video: new Set()
 };
+const LOCAL_PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
+const LOCAL_PAGE_SIZE_DEFAULT = 100;
 const ui = {};
 const byId = (id) => document.getElementById(id);
 const loadFailed = new Map();
@@ -16,8 +18,24 @@ let currentBatchAction = null;
 let lastBatchAction = null;
 let isLocalDeleting = false;
 const cacheListState = {
-  image: { loaded: false, visible: false, items: [] },
-  video: { loaded: false, visible: false, items: [] }
+  image: {
+    loaded: false,
+    visible: false,
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: LOCAL_PAGE_SIZE_DEFAULT,
+    loading: false
+  },
+  video: {
+    loaded: false,
+    visible: false,
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: LOCAL_PAGE_SIZE_DEFAULT,
+    loading: false
+  }
 };
 const UI_MAP = {
   imgCount: 'img-count',
@@ -30,8 +48,6 @@ const UI_MAP = {
   accountTableBody: 'account-table-body',
   accountEmpty: 'account-empty',
   selectAll: 'select-all',
-  localImageSelectAll: 'local-image-select-all',
-  localVideoSelectAll: 'local-video-select-all',
   selectedCount: 'selected-count',
   batchActions: 'batch-actions',
   loadBtn: 'btn-load-stats',
@@ -41,6 +57,28 @@ const UI_MAP = {
   localVideoList: 'local-video-list',
   localImageBody: 'local-image-body',
   localVideoBody: 'local-video-body',
+  localImagePrev: 'local-image-prev',
+  localImageNext: 'local-image-next',
+  localImagePageInfo: 'local-image-page-info',
+  localImagePageSize: 'local-image-page-size',
+  localImageSelectWrap: 'local-image-select-wrap',
+  localImageSelectTrigger: 'local-image-select-trigger',
+  localImageSelectLabel: 'local-image-select-label',
+  localImageSelectCaret: 'local-image-select-caret',
+  localImageSelectPopover: 'local-image-select-popover',
+  localImageSelectPage: 'local-image-select-page',
+  localImageSelectAllBtn: 'local-image-select-all',
+  localVideoPrev: 'local-video-prev',
+  localVideoNext: 'local-video-next',
+  localVideoPageInfo: 'local-video-page-info',
+  localVideoPageSize: 'local-video-page-size',
+  localVideoSelectWrap: 'local-video-select-wrap',
+  localVideoSelectTrigger: 'local-video-select-trigger',
+  localVideoSelectLabel: 'local-video-select-label',
+  localVideoSelectCaret: 'local-video-select-caret',
+  localVideoSelectPopover: 'local-video-select-popover',
+  localVideoSelectPage: 'local-video-select-page',
+  localVideoSelectAllBtn: 'local-video-select-all',
   onlineAssetsTable: 'online-assets-table',
   batchProgress: 'batch-progress',
   batchProgressText: 'batch-progress-text',
@@ -87,6 +125,7 @@ async function init() {
   apiKey = await ensureAdminKey();
   if (apiKey === null) return;
   cacheUI();
+  setupLocalPaginationControls();
   setupCacheCards();
   setupConfirmDialog();
   setupFailureDialog();
@@ -110,6 +149,315 @@ function cacheUI() {
     ui[key] = byId(id);
   });
   ui.cacheCards = document.querySelectorAll('.cache-card');
+}
+
+function getLocalState(type) {
+  return cacheListState[type] || null;
+}
+
+function getLocalPaginationRefs(type) {
+  if (type === 'image') {
+    return {
+      prev: ui.localImagePrev,
+      next: ui.localImageNext,
+      info: ui.localImagePageInfo,
+      size: ui.localImagePageSize,
+      wrap: ui.localImageSelectWrap,
+      trigger: ui.localImageSelectTrigger,
+      label: ui.localImageSelectLabel,
+      caret: ui.localImageSelectCaret,
+      popover: ui.localImageSelectPopover,
+      selectPage: ui.localImageSelectPage,
+      selectAll: ui.localImageSelectAllBtn
+    };
+  }
+  return {
+    prev: ui.localVideoPrev,
+    next: ui.localVideoNext,
+    info: ui.localVideoPageInfo,
+    size: ui.localVideoPageSize,
+    wrap: ui.localVideoSelectWrap,
+    trigger: ui.localVideoSelectTrigger,
+    label: ui.localVideoSelectLabel,
+    caret: ui.localVideoSelectCaret,
+    popover: ui.localVideoSelectPopover,
+    selectPage: ui.localVideoSelectPage,
+    selectAll: ui.localVideoSelectAllBtn
+  };
+}
+
+function setupPageSizeOptions(select, selectedValue) {
+  if (!select) return;
+  const value = Number(selectedValue) || LOCAL_PAGE_SIZE_DEFAULT;
+  select.innerHTML = '';
+  LOCAL_PAGE_SIZE_OPTIONS.forEach(size => {
+    const option = document.createElement('option');
+    option.value = String(size);
+    option.textContent = t('cache.perPage', { size });
+    option.selected = size === value;
+    select.appendChild(option);
+  });
+}
+
+function updateLocalPaginationUI(type) {
+  const state = getLocalState(type);
+  if (!state) return;
+  const refs = getLocalPaginationRefs(type);
+  const total = Math.max(0, Number(state.total) || 0);
+  const pageSize = Math.max(1, Number(state.pageSize) || LOCAL_PAGE_SIZE_DEFAULT);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(Math.max(1, Number(state.page) || 1), totalPages);
+  state.page = page;
+  state.pageSize = pageSize;
+
+  if (refs.info) {
+    refs.info.textContent = t('cache.pagination', {
+      current: page,
+      total: totalPages,
+      count: total
+    });
+  }
+
+  if (refs.prev) refs.prev.disabled = state.loading || page <= 1;
+  if (refs.next) refs.next.disabled = state.loading || page >= totalPages;
+  if (refs.size && String(refs.size.value) !== String(pageSize)) {
+    setupPageSizeOptions(refs.size, pageSize);
+  }
+}
+
+function closeLocalSelectMenu(type) {
+  const refs = getLocalPaginationRefs(type);
+  if (refs.popover) refs.popover.classList.add('hidden');
+}
+
+function closeAllLocalSelectMenus() {
+  closeLocalSelectMenu('image');
+  closeLocalSelectMenu('video');
+}
+
+function isLocalSelectMenuOpen(type) {
+  const refs = getLocalPaginationRefs(type);
+  return !!(refs.popover && !refs.popover.classList.contains('hidden'));
+}
+
+function refreshLocalSelectControl(type) {
+  const refs = getLocalPaginationRefs(type);
+  const selectedCount = selectedLocal[type]?.size || 0;
+  if (refs.label) {
+    refs.label.textContent = selectedCount > 0
+      ? t('cache.clearSelection')
+      : t('common.selectAll');
+  }
+  if (refs.trigger) {
+    refs.trigger.classList.toggle('is-active', selectedCount > 0);
+  }
+  if (refs.caret) {
+    refs.caret.style.display = selectedCount > 0 ? 'none' : 'inline';
+  }
+}
+
+function selectLocalPage(type) {
+  const set = selectedLocal[type];
+  if (!set) return;
+  const items = cacheListState[type]?.items || [];
+  items.forEach(item => {
+    if (item && item.name) set.add(item.name);
+  });
+  syncLocalRowCheckboxes(type);
+  updateSelectedCount();
+  closeLocalSelectMenu(type);
+}
+
+async function fetchAllLocalNames(type) {
+  const names = [];
+  let page = 1;
+  const pageSize = 1000;
+  let total = 0;
+
+  while (true) {
+    const params = new URLSearchParams({
+      type,
+      page: String(page),
+      page_size: String(pageSize)
+    });
+    const res = await fetch(`/v1/admin/cache/list?${params.toString()}`, {
+      headers: buildAuthHeaders(apiKey)
+    });
+    if (!res.ok) {
+      throw new Error(t('common.loadFailed'));
+    }
+    const data = await res.json();
+    const items = Array.isArray(data.items) ? data.items : [];
+    total = Math.max(total, Number(data.total) || 0);
+    items.forEach(item => {
+      if (item && item.name) names.push(item.name);
+    });
+    if (names.length >= total || items.length < pageSize) break;
+    page += 1;
+  }
+  return names;
+}
+
+async function selectLocalAll(type) {
+  try {
+    const names = await fetchAllLocalNames(type);
+    const set = selectedLocal[type];
+    if (!set) return;
+    set.clear();
+    names.forEach(name => set.add(name));
+    syncLocalRowCheckboxes(type);
+    updateSelectedCount();
+  } catch (e) {
+    showToast(t('common.requestFailed'), 'error');
+  } finally {
+    closeLocalSelectMenu(type);
+  }
+}
+
+function clearLocalSelection(type) {
+  const set = selectedLocal[type];
+  if (!set) return;
+  if (set.size === 0) {
+    closeLocalSelectMenu(type);
+    return;
+  }
+  set.clear();
+  syncLocalRowCheckboxes(type);
+  updateSelectedCount();
+  closeLocalSelectMenu(type);
+}
+
+function setupLocalPaginationControls() {
+  const imageState = getLocalState('image');
+  const videoState = getLocalState('video');
+  setupPageSizeOptions(ui.localImagePageSize, imageState?.pageSize);
+  setupPageSizeOptions(ui.localVideoPageSize, videoState?.pageSize);
+
+  if (ui.localImagePrev) {
+    ui.localImagePrev.addEventListener('click', () => {
+      const state = getLocalState('image');
+      if (!state || state.loading) return;
+      if (state.page <= 1) return;
+      closeAllLocalSelectMenus();
+      loadLocalCacheList('image', { page: state.page - 1 });
+    });
+  }
+  if (ui.localImageNext) {
+    ui.localImageNext.addEventListener('click', () => {
+      const state = getLocalState('image');
+      if (!state || state.loading) return;
+      const totalPages = Math.max(1, Math.ceil((state.total || 0) / state.pageSize));
+      if (state.page >= totalPages) return;
+      closeAllLocalSelectMenus();
+      loadLocalCacheList('image', { page: state.page + 1 });
+    });
+  }
+  if (ui.localVideoPrev) {
+    ui.localVideoPrev.addEventListener('click', () => {
+      const state = getLocalState('video');
+      if (!state || state.loading) return;
+      if (state.page <= 1) return;
+      closeAllLocalSelectMenus();
+      loadLocalCacheList('video', { page: state.page - 1 });
+    });
+  }
+  if (ui.localVideoNext) {
+    ui.localVideoNext.addEventListener('click', () => {
+      const state = getLocalState('video');
+      if (!state || state.loading) return;
+      const totalPages = Math.max(1, Math.ceil((state.total || 0) / state.pageSize));
+      if (state.page >= totalPages) return;
+      closeAllLocalSelectMenus();
+      loadLocalCacheList('video', { page: state.page + 1 });
+    });
+  }
+
+  if (ui.localImagePageSize) {
+    ui.localImagePageSize.addEventListener('change', (event) => {
+      const state = getLocalState('image');
+      if (!state) return;
+      const size = parseInt(event.target.value, 10);
+      if (!Number.isFinite(size) || size <= 0) return;
+      state.pageSize = size;
+      state.page = 1;
+      closeAllLocalSelectMenus();
+      loadLocalCacheList('image', { page: 1, pageSize: size });
+    });
+  }
+  if (ui.localVideoPageSize) {
+    ui.localVideoPageSize.addEventListener('change', (event) => {
+      const state = getLocalState('video');
+      if (!state) return;
+      const size = parseInt(event.target.value, 10);
+      if (!Number.isFinite(size) || size <= 0) return;
+      state.pageSize = size;
+      state.page = 1;
+      closeAllLocalSelectMenus();
+      loadLocalCacheList('video', { page: 1, pageSize: size });
+    });
+  }
+
+  if (ui.localImageSelectTrigger) {
+    ui.localImageSelectTrigger.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if ((selectedLocal.image?.size || 0) > 0) {
+        clearLocalSelection('image');
+        return;
+      }
+      if (isLocalSelectMenuOpen('image')) closeLocalSelectMenu('image');
+      else {
+        closeLocalSelectMenu('video');
+        const refs = getLocalPaginationRefs('image');
+        if (refs.popover) refs.popover.classList.remove('hidden');
+      }
+    });
+  }
+  if (ui.localVideoSelectTrigger) {
+    ui.localVideoSelectTrigger.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if ((selectedLocal.video?.size || 0) > 0) {
+        clearLocalSelection('video');
+        return;
+      }
+      if (isLocalSelectMenuOpen('video')) closeLocalSelectMenu('video');
+      else {
+        closeLocalSelectMenu('image');
+        const refs = getLocalPaginationRefs('video');
+        if (refs.popover) refs.popover.classList.remove('hidden');
+      }
+    });
+  }
+
+  if (ui.localImageSelectPage) {
+    ui.localImageSelectPage.addEventListener('click', () => selectLocalPage('image'));
+  }
+  if (ui.localImageSelectAllBtn) {
+    ui.localImageSelectAllBtn.addEventListener('click', () => selectLocalAll('image'));
+  }
+  if (ui.localVideoSelectPage) {
+    ui.localVideoSelectPage.addEventListener('click', () => selectLocalPage('video'));
+  }
+  if (ui.localVideoSelectAllBtn) {
+    ui.localVideoSelectAllBtn.addEventListener('click', () => selectLocalAll('video'));
+  }
+
+  document.addEventListener('click', (event) => {
+    const imageWrap = ui.localImageSelectWrap;
+    const videoWrap = ui.localVideoSelectWrap;
+    if (imageWrap && imageWrap.contains(event.target)) return;
+    if (videoWrap && videoWrap.contains(event.target)) return;
+    closeAllLocalSelectMenus();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeAllLocalSelectMenus();
+    }
+  });
+
+  updateLocalPaginationUI('image');
+  updateLocalPaginationUI('video');
+  refreshLocalSelectControl('image');
+  refreshLocalSelectControl('video');
 }
 
 function ensureUI() {
@@ -461,13 +809,17 @@ async function clearCache(type) {
       const state = cacheListState[type];
       if (state) {
         state.items = [];
+        state.total = 0;
+        state.page = 1;
         state.loaded = true;
+        state.loading = false;
       }
       if (selectedLocal[type]) selectedLocal[type].clear();
       if (state && state.visible) {
         renderLocalCacheList(type, []);
       } else {
         syncLocalSelectAllState(type);
+        updateLocalPaginationUI(type);
         updateSelectedCount();
       }
       loadStats();
@@ -520,18 +872,11 @@ function toggleLocalSelect(type, name, checkbox) {
 }
 
 function toggleLocalSelectAll(type, checkbox) {
-  const set = selectedLocal[type];
-  if (!set) return;
-  const shouldSelect = checkbox && checkbox.checked;
-  set.clear();
-  if (shouldSelect) {
-    const items = cacheListState[type]?.items || [];
-    items.forEach(item => {
-      if (item && item.name) set.add(item.name);
-    });
+  if (checkbox && checkbox.checked) {
+    selectLocalPage(type);
+  } else {
+    clearLocalSelection(type);
   }
-  syncLocalRowCheckboxes(type);
-  updateSelectedCount();
 }
 
 function syncLocalRowCheckboxes(type) {
@@ -550,12 +895,7 @@ function syncLocalRowCheckboxes(type) {
 }
 
 function syncLocalSelectAllState(type) {
-  const selectAll = type === 'image' ? ui.localImageSelectAll : ui.localVideoSelectAll;
-  if (!selectAll) return;
-  const total = cacheListState[type]?.items?.length || 0;
-  const selected = selectedLocal[type]?.size || 0;
-  selectAll.checked = total > 0 && selected === total;
-  selectAll.indeterminate = selected > 0 && selected < total;
+  refreshLocalSelectControl(type);
 }
 
 function syncRowCheckboxes() {
@@ -584,6 +924,8 @@ function updateSelectedCount() {
   const el = ui.selectedCount;
   const selected = getActiveSelectedSet().size;
   if (el) el.textContent = String(selected);
+  refreshLocalSelectControl('image');
+  refreshLocalSelectControl('video');
   setActionButtonsState();
   updateBatchActionsVisibility();
 }
@@ -764,31 +1106,56 @@ async function toggleCacheList(type) {
   await showCacheSection(type);
 }
 
-async function loadLocalCacheList(type) {
+async function loadLocalCacheList(type, options = {}) {
   const body = type === 'image' ? ui.localImageBody : ui.localVideoBody;
   if (!body) return;
+  const state = getLocalState(type);
+  if (!state) return;
+  const pageSize = Math.max(
+    1,
+    parseInt(options.pageSize ?? state.pageSize ?? LOCAL_PAGE_SIZE_DEFAULT, 10) || LOCAL_PAGE_SIZE_DEFAULT
+  );
+  const targetPage = Math.max(1, parseInt(options.page ?? state.page ?? 1, 10) || 1);
+  state.loading = true;
+  state.pageSize = pageSize;
+  state.page = targetPage;
+  updateLocalPaginationUI(type);
   body.innerHTML = `<tr><td colspan="5">${t('common.loading')}</td></tr>`;
   try {
-    const params = new URLSearchParams({ type, page: '1', page_size: '1000' });
+    const params = new URLSearchParams({
+      type,
+      page: String(targetPage),
+      page_size: String(pageSize)
+    });
     const res = await fetch(`/v1/admin/cache/list?${params.toString()}`, {
       headers: buildAuthHeaders(apiKey)
     });
     if (!res.ok) {
       body.innerHTML = `<tr><td colspan="5">${t('common.loadFailed')}</td></tr>`;
+      state.loading = false;
+      updateLocalPaginationUI(type);
       return;
     }
     const data = await res.json();
     const items = Array.isArray(data.items) ? data.items : [];
-    cacheListState[type].items = items;
-    cacheListState[type].loaded = true;
-    const keep = new Set(items.map(item => item.name));
-    const selected = selectedLocal[type];
-    Array.from(selected).forEach(name => {
-      if (!keep.has(name)) selected.delete(name);
-    });
+    const total = Math.max(0, Number(data.total) || 0);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (total > 0 && targetPage > totalPages) {
+      state.loading = false;
+      await loadLocalCacheList(type, { page: totalPages, pageSize });
+      return;
+    }
+    state.items = items;
+    state.total = total;
+    state.page = Math.min(targetPage, totalPages);
+    state.pageSize = pageSize;
+    state.loaded = true;
+    state.loading = false;
     renderLocalCacheList(type, items);
   } catch (e) {
     body.innerHTML = `<tr><td colspan="5">${t('common.loadFailed')}</td></tr>`;
+    state.loading = false;
+    updateLocalPaginationUI(type);
   }
 }
 
@@ -798,6 +1165,8 @@ function renderLocalCacheList(type, items) {
   if (!items || items.length === 0) {
     body.innerHTML = `<tr><td colspan="5" class="table-empty">${t('cache.noFiles')}</td></tr>`;
     syncLocalSelectAllState(type);
+    updateLocalPaginationUI(type);
+    updateSelectedCount();
     return;
   }
   const selected = selectedLocal[type];
@@ -826,6 +1195,8 @@ function renderLocalCacheList(type, items) {
       img.src = item.preview_url;
       img.alt = '';
       img.className = 'cache-preview';
+      img.loading = 'lazy';
+      img.decoding = 'async';
       nameWrap.appendChild(img);
     }
     const nameText = document.createElement('span');
@@ -870,6 +1241,7 @@ function renderLocalCacheList(type, items) {
   });
   body.replaceChildren(fragment);
   syncLocalSelectAllState(type);
+  updateLocalPaginationUI(type);
   updateSelectedCount();
 }
 
@@ -885,12 +1257,11 @@ async function deleteLocalFile(type, name) {
   const okDelete = await requestDeleteLocalFile(type, name);
   if (!okDelete) return;
   showToast(t('common.deleteSuccess'), 'success');
-  const state = cacheListState[type];
-  if (state && Array.isArray(state.items)) {
-    state.items = state.items.filter(item => item.name !== name);
-    state.loaded = true;
+  const state = getLocalState(type);
+  if (state) {
     selectedLocal[type]?.delete(name);
-    if (state.visible) renderLocalCacheList(type, state.items);
+    if (state.total > 0) state.total -= 1;
+    await loadLocalCacheList(type, { page: state.page, pageSize: state.pageSize });
   }
   await loadStats();
 }
@@ -936,14 +1307,11 @@ async function deleteSelectedLocal(type) {
       }
     });
   }
-  const state = cacheListState[type];
-  if (state && Array.isArray(state.items)) {
-    const toRemove = new Set(names);
-    state.items = state.items.filter(item => !toRemove.has(item.name));
-    state.loaded = true;
-  }
+  const state = getLocalState(type);
   selectedLocal[type].clear();
-  if (state && state.visible) renderLocalCacheList(type, state.items);
+  if (state) {
+    await loadLocalCacheList(type, { page: state.page, pageSize: state.pageSize });
+  }
   await loadStats();
   isLocalDeleting = false;
   setActionButtonsState();

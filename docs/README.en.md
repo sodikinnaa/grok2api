@@ -113,7 +113,6 @@ docker compose up -d
 | `grok-3-mini` | 1 | Basic/Super | Yes | Yes | - |
 | `grok-3-thinking` | 1 | Basic/Super | Yes | Yes | - |
 | `grok-4` | 1 | Basic/Super | Yes | Yes | - |
-| `grok-4-mini` | 1 | Basic/Super | Yes | Yes | - |
 | `grok-4-thinking` | 1 | Basic/Super | Yes | Yes | - |
 | `grok-4-heavy` | 4 | Super | Yes | Yes | - |
 | `grok-4.1-mini` | 1 | Basic/Super | Yes | Yes | - |
@@ -164,7 +163,7 @@ curl http://localhost:8000/v1/chat/completions \
 | `parallel_tool_calls` | boolean | Allow parallel tool calls | `true`, `false` |
 | `video_config` | object | **Video model only** | Supported: `grok-imagine-1.0-video` |
 | └─ `aspect_ratio` | string | Video aspect ratio | `16:9`, `9:16`, `1:1`, `2:3`, `3:2`, `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
-| └─ `video_length` | integer | Video length (seconds) | `6`, `10`, `15` |
+| └─ `video_length` | integer | Video length (seconds) | `6` ~ `30` |
 | └─ `resolution_name` | string | Resolution | `480p`, `720p` |
 | └─ `preset` | string | Style preset | `fun`, `normal`, `spicy`, `custom` |
 | `image_config` | object | **Image models only** | Supported: `grok-imagine-1.0` / `grok-imagine-1.0-fast` / `grok-imagine-1.0-edit` |
@@ -333,6 +332,51 @@ curl http://localhost:8000/v1/images/edits \
 
 <br>
 
+### `POST /v1/videos`
+
+> Video generation endpoint (OpenAI videos.create compatible)
+
+```bash
+curl http://localhost:8000/v1/videos \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $GROK2API_API_KEY" \
+  -d '{
+    "model": "grok-imagine-1.0-video",
+    "prompt": "Neon rainy street at night, cinematic slow tracking shot",
+    "size": "1792x1024",
+    "seconds": 18,
+    "quality": "standard"
+  }'
+```
+
+<details>
+<summary>Supported request parameters</summary>
+
+<br>
+
+| Field | Type | Description | Allowed values |
+| :-- | :-- | :-- | :-- |
+| `model` | string | Video model | `grok-imagine-1.0-video` |
+| `prompt` | string | Video prompt | - |
+| `size` | string | Frame size (mapped to aspect_ratio) | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
+| `seconds` | integer | Target duration (seconds) | `6` ~ `30` |
+| `quality` | string | Video quality (mapped to resolution) | `standard`, `high` |
+| `image_reference` | object/string | Reference image (optional) | `{"image_url":"https://..."}` or Data URI |
+| `input_reference` | file | multipart reference image (optional) | `png`, `jpg`, `webp` |
+
+**Notes**:
+
+- Server-side chain extension now supports 6~30 seconds automatically, so **`/v1/video/extend` is not required**.
+- `quality=standard` maps to `480p`; `quality=high` maps to `720p`.
+- For basic-pool requests at `720p`, generation falls back to `480p` first, then upscales according to `video.upscale_timing`.
+- If both `image_reference` and `input_reference` are provided, references are processed in order; the video pipeline uses the first image only.
+
+<br>
+
+</details>
+
+<br>
+
 ## Configuration
 
 Config file: `data/config.toml`
@@ -350,8 +394,8 @@ Config file: `data/config.toml`
 | **app** | `app_url` | App URL | External base URL used for file links. | `""` |
 |  | `app_key` | Admin password | Login password for admin panel. | `grok2api` |
 |  | `api_key` | API key | Optional API key for access (comma-separated string or array). | `""` |
-|  | `public_enabled` | Public mode | Enable public features. | `false` |
-|  | `public_key` | Public key | Public access key (optional). | `""` |
+|  | `function_enabled` | Function mode | Enable function pages/features. | `false` |
+|  | `function_key` | Function key | Access key for function endpoints/pages (optional). | `""` |
 |  | `image_format` | Image format | `url` or `base64`. | `url` |
 |  | `video_format` | Video format | `html` or `url` (processed link). | `html` |
 |  | `temporary` | Temporary chat | Enable temporary chat mode. | `true` |
@@ -406,6 +450,7 @@ Config file: `data/config.toml`
 | **video** | `concurrent` | Concurrency | Reverse video concurrency limit. | `100` |
 |  | `timeout` | Timeout | Reverse video timeout (seconds). | `60` |
 |  | `stream_timeout` | Stream timeout | Stream idle timeout (seconds). | `60` |
+|  | `upscale_timing` | Upscale timing | Basic-pool 720p upscale mode: `single` (after each extension round) / `complete` (after all rounds). | `complete` |
 | **voice** | `timeout` | Timeout | Voice request timeout (seconds). | `60` |
 | **asset** | `upload_concurrent` | Upload concurrency | Upload concurrency. | `100` |
 |  | `upload_timeout` | Upload timeout | Upload timeout (seconds). | `60` |
