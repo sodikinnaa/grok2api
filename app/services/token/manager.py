@@ -579,23 +579,26 @@ class TokenManager:
                 status = e.details.get("status") if e.details else getattr(e, "status_code", None)
                 is_token_expired = e.details.get("is_token_expired", False) if e.details else False
                 
-                # 如果 401 且已确认是 Token 过期（非 Cloudflare 拦截等环境问题）
-                if status == 401 and is_token_expired:
-                    await self.record_fail(token_str, status, "rate_limits_auth_failed")
-                    # Token 已过期，不进行本地降级，直接返回失败以寻找下一个可用 Token
-                    logger.warning(
-                        f"Token {raw_token[:10]}...: API sync failed (Confirmed Token Expired), skipping fallback"
-                    )
-                    return False
-                
-                # 如果是 401 但无法确认过期（可能是环境干扰、Cloudflare、或不明确的 401）
-                # 我们按照您的要求“保留之前的逻辑不变”，即记录失败后尝试降级（fallback to local）
                 if status == 401:
-                    await self.record_fail(token_str, status, "rate_limits_auth_unknown")
-
+                    # 只要是 401，都应该记录一次失败，增加 fail_count
+                    reason = "rate_limits_auth_failed" if is_token_expired else "rate_limits_auth_unknown"
+                    
+                    # 如果确认为过期，传入 threshold=1 强制立即失效
+                    await self.record_fail(token_str, status, reason, threshold=1 if is_token_expired else None)
+                    
+                    if is_token_expired:
+                        # 只有确认过期的才跳过 fallback
+                        logger.warning(
+                            f"Token {raw_token[:10]}...: API sync failed (Confirmed Token Expired), skipping fallback"
+                        )
+                        return False
+                
             logger.warning(
-                f"Token {raw_token[:10]}...: API sync failed, fallback to local ({e})"
+                f"Token {raw_token[:10]}...: API sync failed, error: {e}"
             )
+            # 如果不执行降级扣费（例如在刷新状态时），则直接返回 False 表示同步失败
+            if not consume_on_fail:
+                return False
 
         # 降级：本地预估扣费
         if consume_on_fail:
@@ -608,7 +611,7 @@ class TokenManager:
             return False
 
     async def record_fail(
-        self, token_str: str, status_code: int = 401, reason: str = ""
+        self, token_str: str, status_code: int = 401, reason: str = "", threshold: Optional[int] = None
     ) -> bool:
         """
         记录 Token 失败
@@ -617,6 +620,7 @@ class TokenManager:
             token_str: Token 字符串
             status_code: HTTP Status Code
             reason: 失败原因
+            threshold: 强制失败阈值
 
         Returns:
             是否成功
@@ -627,18 +631,22 @@ class TokenManager:
             token = pool.get(raw_token)
             if token:
                 if status_code == 401:
-                    threshold = get_config("token.fail_threshold", FAIL_THRESHOLD)
-                    try:
-                        threshold = int(threshold)
-                    except (TypeError, ValueError):
-                        threshold = FAIL_THRESHOLD
+                    if threshold is None:
+                        threshold = get_config("token.fail_threshold", FAIL_THRESHOLD)
+                        try:
+                            threshold = int(threshold)
+                        except (TypeError, ValueError):
+                            threshold = FAIL_THRESHOLD
+                    
                     if threshold < 1:
                         threshold = 1
 
                     token.record_fail(status_code, reason, threshold=threshold)
-                    logger.warning(
+                    
+                    log_level = logger.warning if token.status == TokenStatus.EXPIRED else logger.info
+                    log_level(
                         f"Token {raw_token[:10]}...: recorded {status_code} failure "
-                        f"({token.fail_count}/{threshold}) - {reason}"
+                        f"({token.fail_count}/{threshold}) - {reason} - status: {token.status}"
                     )
                     self._track_token_change(token, pool.name, "state")
                     self._schedule_save()

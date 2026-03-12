@@ -74,20 +74,26 @@ class RateLimitsReverse:
                     server_header = response.headers.get("Server", "").lower()
                     content_type = response.headers.get("Content-Type", "").lower()
                     
-                    # 1. 如果是 Cloudflare 拦截，通常 Server 头包含 cloudflare，且返回 HTML (包含 challenge 关键字)
-                    is_cloudflare = "cloudflare" in server_header or "challenge-platform" in resp_text
+                    # 1. 只有当返回不是 JSON 且包含 cloudflare 关键字，或者包含特定的 challenge 标志时，才认为是网络拦截
+                    is_cloudflare = "challenge-platform" in resp_text
+                    if "cloudflare" in server_header and "application/json" not in content_type:
+                        is_cloudflare = True
                     
                     # 2. 如果是 401 且返回 JSON 内容包含认证失败关键字，则确认为 Token 过期
                     if response.status_code == 401 and "application/json" in content_type:
-                        # Grok 典型的认证失败返回通常包含 unauthorized 相关信息
-                        if "unauthorized" in resp_text.lower() or "not logged in" in resp_text.lower():
+                        # 增加 unauthenticated 和 bad-credentials 等更精确的关键字
+                        body_lower = resp_text.lower()
+                        auth_error_keywords = ["unauthorized", "not logged in", "unauthenticated", "bad-credentials"]
+                        if any(k in body_lower for k in auth_error_keywords):
                             is_token_expired = True
                     # --- 识别逻辑结束 ---
 
                     logger.error(
-                        f"RateLimitsReverse: Request failed, status={response.status_code}, "
-                        f"is_token_expired={is_token_expired}, is_cloudflare={is_cloudflare}, "
-                        f"Body: {resp_text[:300]}",
+                        "RateLimitsReverse: Request failed, status={}, is_token_expired={}, is_cloudflare={}, Body: {}",
+                        response.status_code,
+                        is_token_expired,
+                        is_cloudflare,
+                        resp_text[:300],
                         extra={"error_type": "UpstreamException"},
                     )
                     
@@ -109,20 +115,24 @@ class RateLimitsReverse:
             # Handle upstream exception
             if isinstance(e, UpstreamException):
                 status = None
-                if e.details and "status" in e.details:
-                    status = e.details["status"]
-                else:
+                if e.details and isinstance(e.details, dict):
+                    status = e.details.get("status")
+                
+                if status is None:
                     status = getattr(e, "status_code", None)
+                
+                logger.debug(f"RateLimitsReverse: Upstream error caught: {str(e)}, status={status}")
                 raise
 
             # Handle other non-upstream exceptions
+            import traceback
+            error_details = traceback.format_exc()
             logger.error(
-                f"RateLimitsReverse: Request failed, {str(e)}",
-                extra={"error_type": type(e).__name__},
+                f"RateLimitsReverse: Unexpected error, {type(e).__name__}: {str(e)}\n{error_details}"
             )
             raise UpstreamException(
                 message=f"RateLimitsReverse: Request failed, {str(e)}",
-                details={"status": 502, "error": str(e)},
+                details={"status": 502, "error": str(e), "traceback": error_details},
             )
 
 

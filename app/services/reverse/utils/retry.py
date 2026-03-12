@@ -184,7 +184,9 @@ async def retry_on_status(
 
             if status_code is None:
                 # Error cannot be identified as retryable
-                logger.error(f"Non-retryable error: {e}")
+                import traceback
+                error_details = traceback.format_exc()
+                logger.error(f"Non-retryable error: {type(e).__name__}: {e}\n{error_details}")
                 raise
 
             # Record error
