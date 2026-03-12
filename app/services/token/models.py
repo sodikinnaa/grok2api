@@ -136,9 +136,10 @@ class TokenInfo(BaseModel):
         self.use_count += actual_cost
         self.quota = max(0, self.quota - actual_cost)
 
-        # 默认行为：quota 耗尽时标记冷却
+        # 默认行为：quota 耗尽时标记冷却，并重置消耗记录
         if self.quota == 0:
             self.status = TokenStatus.COOLING
+            self.consumed = 0  # 进入冷却时重置本轮消耗
         elif self.status == TokenStatus.COOLING:
             # 只从 COOLING 恢复，不从 EXPIRED 恢复
             self.status = TokenStatus.ACTIVE

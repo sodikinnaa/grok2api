@@ -673,6 +673,7 @@ class TokenManager:
                 old_quota = token.quota
                 token.quota = 0
                 token.status = TokenStatus.COOLING
+                token.consumed = 0  # 进入冷却时重置本轮消耗
                 logger.warning(
                     f"Token {raw_token[:10]}...: marked as rate limited "
                     f"(quota {old_quota} -> 0, status -> cooling)"
@@ -959,15 +960,13 @@ class TokenManager:
                     if consumed_mode:
                         # Consumed 模式：使用新逻辑
                         token_info.update_quota_with_consumed(new_quota)
-                        # 刷新成功后重置消耗记录
-                        if new_quota > 0:
-                            token_info.consumed = 0
                     else:
                         # 默认模式：使用旧逻辑
                         token_info.update_quota(new_quota)
-                        # 刷新成功后如果 quota > 0，清除冷却状态
-                        if new_quota > 0:
-                            token_info.status = TokenStatus.ACTIVE
+
+                    # 刷新成功后如果 quota > 0，恢复活跃状态
+                    if new_quota > 0:
+                        token_info.status = TokenStatus.ACTIVE
                     token_info.mark_synced()
 
                     window_size = self._extract_window_size_seconds(result)
