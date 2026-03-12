@@ -576,13 +576,23 @@ class TokenManager:
 
         except Exception as e:
             if isinstance(e, UpstreamException):
-                status = None
-                if e.details and "status" in e.details:
-                    status = e.details["status"]
-                else:
-                    status = getattr(e, "status_code", None)
-                if status == 401:
+                status = e.details.get("status") if e.details else getattr(e, "status_code", None)
+                is_token_expired = e.details.get("is_token_expired", False) if e.details else False
+                
+                # 如果 401 且已确认是 Token 过期（非 Cloudflare 拦截等环境问题）
+                if status == 401 and is_token_expired:
                     await self.record_fail(token_str, status, "rate_limits_auth_failed")
+                    # Token 已过期，不进行本地降级，直接返回失败以寻找下一个可用 Token
+                    logger.warning(
+                        f"Token {raw_token[:10]}...: API sync failed (Confirmed Token Expired), skipping fallback"
+                    )
+                    return False
+                
+                # 如果是 401 但无法确认过期（可能是环境干扰、Cloudflare、或不明确的 401）
+                # 我们按照您的要求“保留之前的逻辑不变”，即记录失败后尝试降级（fallback to local）
+                if status == 401:
+                    await self.record_fail(token_str, status, "rate_limits_auth_unknown")
+
             logger.warning(
                 f"Token {raw_token[:10]}...: API sync failed, fallback to local ({e})"
             )
@@ -605,7 +615,7 @@ class TokenManager:
 
         Args:
             token_str: Token 字符串
-            status_code: HTTP 状态码
+            status_code: HTTP Status Code
             reason: 失败原因
 
         Returns:
