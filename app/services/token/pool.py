@@ -78,25 +78,12 @@ class TokenPool:
                 if preferred:
                     available = preferred
 
-            # 分离新旧数据：consumed > 0 为新逻辑，consumed == 0 需要兼容旧逻辑
-            new_logic_tokens = [t for t in available if t.consumed > 0]
-            old_logic_tokens = [t for t in available if t.consumed == 0]
-
-            # 旧数据需要检查 quota > 0
-            old_logic_tokens = [t for t in old_logic_tokens if t.quota > 0]
-
-            # 优先使用新逻辑的 Token（按 consumed 排序）
-            if new_logic_tokens:
-                available = new_logic_tokens
-            elif old_logic_tokens:
-                available = old_logic_tokens
-            else:
-                return None
-
             # 找到最小消耗（优先选择消耗少的）
             min_consumed = min(t.consumed for t in available)
             candidates = [t for t in available if t.consumed == min_consumed]
             return random.choice(candidates)
+
+
         else:
             # ===== 默认模式（旧逻辑）=====
             available = [
