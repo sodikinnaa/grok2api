@@ -5,6 +5,7 @@ Reverse interface: download asset.
 import urllib.parse
 from typing import Any
 from pathlib import Path
+from urllib.parse import urlparse
 from curl_cffi.requests import AsyncSession
 
 from app.core.logger import logger
@@ -42,10 +43,21 @@ class AssetsDownloadReverse:
             Any: The response from the request.
         """
         try:
-            # Normalize path
-            if not file_path.startswith("/"):
-                file_path = f"/{file_path}"
-            url = f"{DOWNLOAD_API}{file_path}"
+            parsed = urlparse(file_path)
+            origin = "https://assets.grok.com"
+            referer = "https://grok.com/"
+            if parsed.scheme and parsed.netloc:
+                url = file_path
+                request_path = parsed.path or "/"
+                if parsed.query:
+                    request_path = f"{request_path}?{parsed.query}"
+                origin = f"{parsed.scheme}://{parsed.netloc}"
+                referer = f"{origin}/"
+            else:
+                if not file_path.startswith("/"):
+                    file_path = f"/{file_path}"
+                request_path = file_path
+                url = f"{DOWNLOAD_API}{file_path}"
 
             # Get proxies
             base_proxy = get_config("proxy.base_proxy_url") or ""
@@ -58,14 +70,14 @@ class AssetsDownloadReverse:
                 proxies = None
 
             # Guess content type by extension for Accept/Sec-Fetch-Dest
-            content_type = _CONTENT_TYPES.get(Path(urllib.parse.urlparse(file_path).path).suffix.lower())
+            content_type = _CONTENT_TYPES.get(Path(urllib.parse.urlparse(request_path).path).suffix.lower())
 
             # Build headers
             headers = build_headers(
                 cookie_token=token,
                 content_type=content_type,
-                origin="https://assets.grok.com",
-                referer="https://grok.com/",
+                origin=origin,
+                referer=referer,
             )
             ## Align with browser download navigation headers
             headers["Cache-Control"] = "no-cache"
