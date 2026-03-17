@@ -7,7 +7,13 @@ import inspect
 import random
 from typing import Callable, Any, Optional
 
-from curl_cffi.requests.errors import ConnectionError, CurlError, DNSError, ProxyError, SSLError
+from curl_cffi import CurlError
+from curl_cffi.requests.exceptions import (
+    ConnectionError,
+    DNSError,
+    ProxyError,
+    SSLError,
+)
 
 from app.core.logger import logger
 from app.core.config import get_config
