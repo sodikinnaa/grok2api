@@ -7,9 +7,21 @@ import inspect
 import random
 from typing import Callable, Any, Optional
 
+from curl_cffi.requests.errors import ConnectionError, CurlError, DNSError, ProxyError, SSLError
+
 from app.core.logger import logger
 from app.core.config import get_config
 from app.core.exceptions import UpstreamException
+
+
+_TRANSPORT_RETRY_STATUS = 502
+_TRANSPORT_RETRY_ERRORS = (
+    ConnectionError,
+    CurlError,
+    DNSError,
+    ProxyError,
+    SSLError,
+)
 
 
 class RetryContext:
@@ -128,6 +140,17 @@ def extract_retry_after(error: Exception) -> Optional[float]:
     return None
 
 
+def extract_status_for_retry(error: Exception) -> Optional[int]:
+    """Extract a retry status code from application or transport errors."""
+    if isinstance(error, UpstreamException):
+        if error.details and "status" in error.details:
+            return error.details["status"]
+        return getattr(error, "status_code", None)
+    if isinstance(error, _TRANSPORT_RETRY_ERRORS):
+        return _TRANSPORT_RETRY_STATUS
+    return None
+
+
 async def retry_on_status(
     func: Callable,
     *args,
@@ -156,14 +179,7 @@ async def retry_on_status(
 
     # Status code extractor
     if extract_status is None:
-
-        def extract_status(e: Exception) -> Optional[int]:
-            if isinstance(e, UpstreamException):
-                # Try to get status code from details, fallback to status_code attribute
-                if e.details and "status" in e.details:
-                    return e.details["status"]
-                return getattr(e, "status_code", None)
-            return None
+        extract_status = extract_status_for_retry
 
     while ctx.attempt <= ctx.max_retry:
         try:
@@ -239,6 +255,7 @@ async def retry_on_status(
 
 __all__ = [
     "RetryContext",
-    "retry_on_status",
     "extract_retry_after",
+    "extract_status_for_retry",
+    "retry_on_status",
 ]
