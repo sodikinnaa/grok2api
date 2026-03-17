@@ -23,7 +23,7 @@ env_file = BASE_DIR / ".env"
 if env_file.exists():
     load_dotenv(env_file)
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi import Depends  # noqa: E402
 
@@ -134,6 +134,11 @@ def create_app() -> FastAPI:
 
     # 请求日志和 ID 中间件
     app.add_middleware(ResponseLoggerMiddleware)
+
+    @app.middleware("http")
+    async def ensure_config_loaded(request: Request, call_next):
+        await config.ensure_loaded()
+        return await call_next(request)
 
     # 注册异常处理器
     register_exception_handlers(app)

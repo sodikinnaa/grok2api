@@ -97,6 +97,7 @@ const LOCALE_MAP = {
 
   "video": {
     "label": "视频配置",
+    "enable_public_asset": { title: "公开资产链接", desc: "是否开启生成结束后创建 Public 资产。" },
     "concurrent": { title: "并发上限", desc: "Reverse 接口并发上限。" },
     "timeout": { title: "请求超时", desc: "Reverse 接口超时时间（秒）。" },
     "stream_timeout": { title: "流空闲超时", desc: "流式空闲超时时间（秒）。" },
@@ -158,7 +159,8 @@ const LOCALE_MAP = {
     "reload_interval_sec": { title: "同步间隔", desc: "多 worker 场景下 Token 状态刷新间隔（秒）。" },
     "on_demand_refresh_enabled": { title: "按需刷新", desc: "当请求拿不到可用 Token 时，是否允许触发受限的按需刷新。" },
     "on_demand_refresh_min_interval_sec": { title: "按需刷新最小间隔", desc: "请求侧按需刷新之间的最小间隔（秒），用于避免刷新风暴。" },
-    "on_demand_refresh_max_tokens": { title: "按需刷新最大数量", desc: "单次请求侧按需刷新最多检查多少个 cooling Token。" }
+    "on_demand_refresh_max_tokens": { title: "按需刷新最大数量", desc: "单次请求侧按需刷新最多检查多少个 cooling Token。" },
+    "consumed_mode_enabled": { title: "启用消耗模式", desc: "启用新额度管理逻辑：使用本地消耗记录而非 API 返回值，支持更均衡的负载分配。（试验性功能，默认关闭）" }
   },
 
   "log": {
