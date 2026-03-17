@@ -50,7 +50,11 @@ async def get_tokens():
     results = {}
     for pool_name, pool in mgr.pools.items():
         results[pool_name] = [t.model_dump() for t in pool.list()]
-    return results or {}
+    consumed_mode = get_config("token.consumed_mode_enabled", False)
+    return {
+        "tokens": results or {},
+        "consumed_mode_enabled": consumed_mode,
+    }
 
 
 @router.post("/tokens", dependencies=[Depends(verify_app_key)])

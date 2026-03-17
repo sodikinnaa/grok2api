@@ -150,6 +150,13 @@ class TokenManager:
             return
         await self.reload()
 
+    def _is_consumed_mode(self) -> bool:
+        """集中处理 consumed mode 配置读取。"""
+        try:
+            return bool(get_config("token.consumed_mode_enabled", False))
+        except Exception:
+            return False
+
     def _mark_state_change(self):
         self._has_state_changes = True
         self._state_change_seq += 1
@@ -471,7 +478,10 @@ class TokenManager:
             token = pool.get(raw_token)
             if token:
                 old_status = token.status
-                consumed = token.consume(effort)
+                if self._is_consumed_mode():
+                    consumed = token.consume_with_consumed(effort)
+                else:
+                    consumed = token.consume(effort)
                 logger.debug(
                     f"Token {raw_token[:10]}...: consumed {consumed} quota, use_count={token.use_count}"
                 )
@@ -533,7 +543,10 @@ class TokenManager:
                 old_quota = target_token.quota
                 old_status = target_token.status
 
-                target_token.update_quota(new_quota)
+                if self._is_consumed_mode():
+                    target_token.update_quota_with_consumed(new_quota)
+                else:
+                    target_token.update_quota(new_quota)
                 target_token.record_success(is_usage=is_usage)
                 target_token.mark_synced()
 
@@ -679,7 +692,7 @@ class TokenManager:
             if token:
                 old_quota = token.quota
                 token.quota = 0
-                token.status = TokenStatus.COOLING
+                token.enter_cooling()
                 logger.warning(
                     f"Token {raw_token[:10]}...: marked as rate limited "
                     f"(quota {old_quota} -> 0, status -> cooling)"
@@ -953,7 +966,10 @@ class TokenManager:
                     old_quota = token_info.quota
                     old_status = token_info.status
 
-                    token_info.update_quota(new_quota)
+                    if self._is_consumed_mode():
+                        token_info.update_quota_with_consumed(new_quota)
+                    else:
+                        token_info.update_quota(new_quota)
                     token_info.mark_synced()
 
                     window_size = self._extract_window_size_seconds(result)
