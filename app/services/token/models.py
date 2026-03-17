@@ -109,12 +109,26 @@ class TokenInfo(BaseModel):
             raise ValueError("token cannot be empty")
         return token
 
-    def is_available(self) -> bool:
-        """检查是否可用（状态正常且未达到冷却阈值）"""
-        # 兼容旧数据：没有 consumed 字段时回退到 quota 判断
-        if self.consumed > 0:
-            return self.status == TokenStatus.ACTIVE
-        return self.status == TokenStatus.ACTIVE and self.quota > 0
+    def is_available(self, consumed_mode: bool = False) -> bool:
+        """检查当前模式下 token 是否可用。"""
+        if self.status != TokenStatus.ACTIVE:
+            return False
+        if consumed_mode:
+            return True
+        return self.quota > 0
+
+    def enter_cooling(self, reset_consumed: bool = True):
+        """进入冷却状态，并在新窗口开始时清空 consumed。"""
+        self.status = TokenStatus.COOLING
+        if reset_consumed:
+            self.consumed = 0
+
+    def recover_active(self, allow_from_expired: bool = False):
+        """仅在允许的前提下恢复为 active。"""
+        if self.status == TokenStatus.COOLING:
+            self.status = TokenStatus.ACTIVE
+        elif allow_from_expired and self.status == TokenStatus.EXPIRED:
+            self.status = TokenStatus.ACTIVE
 
     def consume(self, effort: EffortType = EffortType.LOW) -> int:
         """
@@ -138,11 +152,9 @@ class TokenInfo(BaseModel):
 
         # 默认行为：quota 耗尽时标记冷却，并重置消耗记录
         if self.quota == 0:
-            self.status = TokenStatus.COOLING
-            self.consumed = 0  # 进入冷却时重置本轮消耗
-        elif self.status == TokenStatus.COOLING:
-            # 只从 COOLING 恢复，不从 EXPIRED 恢复
-            self.status = TokenStatus.ACTIVE
+            self.enter_cooling()
+        else:
+            self.recover_active()
 
         return actual_cost
 
@@ -165,9 +177,7 @@ class TokenInfo(BaseModel):
         self.use_count += 1
 
         # consumed 模式下不自动判断冷却，由 Rate Limits 检查或 429 触发
-        if self.status == TokenStatus.COOLING:
-            # 只从 COOLING 恢复，不从 EXPIRED 恢复
-            self.status = TokenStatus.ACTIVE
+        self.recover_active()
 
         return cost
 
@@ -181,12 +191,9 @@ class TokenInfo(BaseModel):
         self.quota = max(0, new_quota)
 
         if self.quota == 0:
-            self.status = TokenStatus.COOLING
-        elif self.quota > 0 and self.status in [
-            TokenStatus.COOLING,
-            TokenStatus.EXPIRED,
-        ]:
-            self.status = TokenStatus.ACTIVE
+            self.enter_cooling()
+        else:
+            self.recover_active(allow_from_expired=True)
 
     def update_quota_with_consumed(self, new_quota: int):
         """
@@ -199,7 +206,10 @@ class TokenInfo(BaseModel):
         """
         self.quota = max(0, new_quota)
 
-        # consumed 模式下不再自动判断冷却，冷却由 Rate Limits 检查或 429 触发
+        if self.quota == 0:
+            self.enter_cooling()
+        else:
+            self.recover_active()
 
     def reset(self, default_quota: Optional[int] = None):
         """重置配额到默认值"""

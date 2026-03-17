@@ -150,6 +150,13 @@ class TokenManager:
             return
         await self.reload()
 
+    def _is_consumed_mode(self) -> bool:
+        """集中处理 consumed mode 配置读取。"""
+        try:
+            return bool(get_config("token.consumed_mode_enabled", False))
+        except Exception:
+            return False
+
     def _mark_state_change(self):
         self._has_state_changes = True
         self._state_change_seq += 1
@@ -471,15 +478,7 @@ class TokenManager:
             token = pool.get(raw_token)
             if token:
                 old_status = token.status
-                # 检查是否启用消耗模式
-                consumed_mode = False
-                try:
-                    from app.core.config import get_config
-                    consumed_mode = get_config("token.consumed_mode_enabled", False)
-                except Exception:
-                    pass
-
-                if consumed_mode:
+                if self._is_consumed_mode():
                     consumed = token.consume_with_consumed(effort)
                 else:
                     consumed = token.consume(effort)
@@ -544,7 +543,10 @@ class TokenManager:
                 old_quota = target_token.quota
                 old_status = target_token.status
 
-                target_token.update_quota(new_quota)
+                if self._is_consumed_mode():
+                    target_token.update_quota_with_consumed(new_quota)
+                else:
+                    target_token.update_quota(new_quota)
                 target_token.record_success(is_usage=is_usage)
                 target_token.mark_synced()
 
@@ -690,8 +692,7 @@ class TokenManager:
             if token:
                 old_quota = token.quota
                 token.quota = 0
-                token.status = TokenStatus.COOLING
-                token.consumed = 0  # 进入冷却时重置本轮消耗
+                token.enter_cooling()
                 logger.warning(
                     f"Token {raw_token[:10]}...: marked as rate limited "
                     f"(quota {old_quota} -> 0, status -> cooling)"
@@ -965,26 +966,10 @@ class TokenManager:
                     old_quota = token_info.quota
                     old_status = token_info.status
 
-                    token_info.update_quota(new_quota)
-
-                    # 检查是否启用 consumed 模式
-                    consumed_mode = False
-                    try:
-                        from app.core.config import get_config
-                        consumed_mode = get_config("token.consumed_mode_enabled", False)
-                    except Exception:
-                        pass
-
-                    if consumed_mode:
-                        # Consumed 模式：使用新逻辑
+                    if self._is_consumed_mode():
                         token_info.update_quota_with_consumed(new_quota)
                     else:
-                        # 默认模式：使用旧逻辑
                         token_info.update_quota(new_quota)
-
-                    # 刷新成功后如果 quota > 0，恢复活跃状态
-                    if new_quota > 0:
-                        token_info.status = TokenStatus.ACTIVE
                     token_info.mark_synced()
 
                     window_size = self._extract_window_size_seconds(result)

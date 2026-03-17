@@ -63,7 +63,7 @@ class TokenPool:
             available = [
                 t
                 for t in self._tokens.values()
-                if t.status == TokenStatus.ACTIVE
+                if t.is_available(consumed_mode=True)
                 and (not exclude or t.token not in exclude)
             ]
 
@@ -89,8 +89,7 @@ class TokenPool:
             available = [
                 t
                 for t in self._tokens.values()
-                if t.status == TokenStatus.ACTIVE
-                and t.quota > 0
+                if t.is_available(consumed_mode=False)
                 and (not exclude or t.token not in exclude)
             ]
 

@@ -540,7 +540,6 @@ function openEditModal(index) {
     byId('edit-original-token').value = item.token;
     byId('edit-original-pool').value = item.pool;
     byId('edit-pool').value = item.pool;
-    byId('edit-quota').value = item.quota;
     byId('edit-note').value = item.note;
 
     // 根据配置决定是否禁用 quota 编辑
@@ -548,17 +547,17 @@ function openEditModal(index) {
     const quotaInputParent = quotaInput?.closest('div');
     const quotaLabel = quotaInputParent?.previousElementSibling;
     if (consumedModeEnabled) {
+      quotaInput.value = item.consumed || 0;
       quotaInput.disabled = true;
       quotaInput.classList.add('bg-gray-100', 'text-gray-400');
       if (quotaLabel) quotaLabel.textContent = t('token.tableQuotaConsumed');
     } else {
+      quotaInput.value = item.quota;
       quotaInput.disabled = false;
       quotaInput.classList.remove('bg-gray-100', 'text-gray-400');
       if (quotaLabel) quotaLabel.textContent = t('token.editQuota');
     }
 
-    document.querySelector('#edit-modal h3').innerText = t('token.editTitle');
-    byId('edit-note').value = item.note;
     document.querySelector('#edit-modal h3').innerText = t('token.editTitle');
   } else {
     // New Token
@@ -612,13 +611,16 @@ async function saveEdit() {
   // Collect data
   let token;
   const newPool = byId('edit-pool').value.trim();
-  const newQuota = parseInt(byId('edit-quota').value) || 0;
+  const quotaFieldValue = parseInt(byId('edit-quota').value, 10);
   const newNote = byId('edit-note').value.trim().slice(0, 50);
 
   if (currentEditIndex >= 0) {
     // Updating existing
     const item = flatTokens[currentEditIndex];
     token = item.token;
+    const newQuota = consumedModeEnabled
+      ? item.quota
+      : (Number.isNaN(quotaFieldValue) ? 0 : quotaFieldValue);
 
     // Update flatTokens first to reflect UI
     item.pool = newPool || 'ssoBasic';
@@ -626,6 +628,7 @@ async function saveEdit() {
     item.note = newNote;
   } else {
     // Creating new
+    const newQuota = Number.isNaN(quotaFieldValue) ? 0 : quotaFieldValue;
     token = byId('edit-token-display').value.trim();
     if (!token) return showToast(t('token.tokenEmpty'), 'error');
 
@@ -638,6 +641,7 @@ async function saveEdit() {
       token: token,
       pool: newPool || 'ssoBasic',
       quota: newQuota,
+      consumed: 0,
       note: newNote,
       status: 'active', // default
       use_count: 0,
@@ -732,6 +736,7 @@ async function syncToServer() {
       token: t.token,
       status: t.status,
       quota: t.quota,
+      consumed: t.consumed || 0,
       note: t.note,
       fail_count: t.fail_count,
       use_count: t.use_count || 0,
@@ -787,6 +792,7 @@ async function submitImport() {
         pool: pool,
         status: 'active',
         quota: defaultQuota,
+        consumed: 0,
         note: '',
         tags: [],
         fail_count: 0,
