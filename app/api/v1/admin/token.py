@@ -153,12 +153,7 @@ async def refresh_tokens(data: dict):
 
         results = {}
         for token, res in raw_results.items():
-            # 只要请求执行了（不论 Token 是否可用），对于刷新动作来说都是完成的
-            # 我们通过检查是否包含 ok 字段来判定任务是否真正执行过
-            if "ok" in res:
-                results[token] = res.get("ok")
-            else:
-                results[token] = False
+            results[token] = bool(res.get("ok")) and res.get("data") is True
 
         response = {"status": "success", "results": results}
         return response
@@ -187,7 +182,7 @@ async def refresh_tokens_async(data: dict):
         try:
 
             async def _on_item(item: str, res: dict):
-                task.record(bool(res.get("ok")))
+                task.record(bool(res.get("ok")) and res.get("data") is True)
 
             raw_results = await UsageService.batch(
                 unique_tokens,

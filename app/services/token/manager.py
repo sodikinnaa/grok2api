@@ -918,7 +918,7 @@ class TokenManager:
                         return None, None, e
 
                     ctx.record_error(status, e)
-                    if not ctx.should_retry(status):
+                    if not ctx.should_retry(status, e):
                         return None, status, e
 
                     retry_after = extract_retry_after(e)
@@ -991,12 +991,23 @@ class TokenManager:
                     }
 
                 if status == 401:
-                    logger.error(
-                        f"Token {token_info.token[:10]}...: 401 after retries, "
-                        f"marking as expired"
+                    is_token_expired = (
+                        isinstance(error, UpstreamException)
+                        and isinstance(error.details, dict)
+                        and error.details.get("is_token_expired", False)
                     )
-                    token_info.status = TokenStatus.EXPIRED
-                    return {"recovered": False, "expired": True}
+                    if is_token_expired:
+                        logger.error(
+                            f"Token {token_info.token[:10]}...: confirmed expired after refresh, "
+                            f"marking as expired"
+                        )
+                        token_info.status = TokenStatus.EXPIRED
+                        return {"recovered": False, "expired": True}
+                    logger.warning(
+                        f"Token {token_info.token[:10]}...: 401 during refresh but not confirmed expired, "
+                        f"keeping current status"
+                    )
+                    return {"recovered": False, "expired": False}
 
                 if error:
                     logger.warning(
