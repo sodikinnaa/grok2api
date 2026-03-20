@@ -2,6 +2,7 @@
 Reverse interface: app chat conversations.
 """
 
+import inspect
 import orjson
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -33,6 +34,43 @@ def _normalize_chat_proxy(proxy_url: str) -> str:
 
 class AppChatReverse:
     """/rest/app-chat/conversations/new reverse interface."""
+
+    @staticmethod
+    async def _read_error_body(response: Any) -> str:
+        """Best-effort read for non-200 upstream responses."""
+        readers = (
+            "text",
+            "atext",
+            "read",
+            "aread",
+        )
+        for attr_name in readers:
+            attr = getattr(response, attr_name, None)
+            if attr is None:
+                continue
+            try:
+                value = attr() if callable(attr) else attr
+                if inspect.isawaitable(value):
+                    value = await value
+                if value is None:
+                    continue
+                if isinstance(value, bytes):
+                    value = value.decode("utf-8", errors="ignore")
+                value = str(value)
+                if value:
+                    return value
+            except Exception:
+                continue
+
+        content = getattr(response, "content", None)
+        if content:
+            try:
+                if isinstance(content, bytes):
+                    return content.decode("utf-8", errors="ignore")
+                return str(content)
+            except Exception:
+                pass
+        return ""
 
     @staticmethod
     def _resolve_custom_personality() -> Optional[str]:
@@ -214,20 +252,14 @@ class AppChatReverse:
                 )
 
                 if response.status_code != 200:
+                    content = await AppChatReverse._read_error_body(response)
+                    content_type = str(response.headers.get("content-type", ""))
 
-                    # Get response content
-                    content = ""
-                    try:
-                        content = await response.text()
-                    except Exception:
-                        pass
-
-                    logger.debug(
-                        "AppChatReverse: Chat failed response body: %s",
-                        content,
-                    )
                     logger.error(
-                        f"AppChatReverse: Chat failed, {response.status_code}",
+                        "AppChatReverse: Chat failed, %s, content_type=%s, body=%s",
+                        response.status_code,
+                        content_type,
+                        content[:500],
                         extra={"error_type": "UpstreamException"},
                     )
                     raise UpstreamException(
