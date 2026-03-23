@@ -73,6 +73,52 @@ def _pick_str(value: Any) -> str:
     return ""
 
 
+def _extract_last_user_prompt_and_images(
+    messages: List[Dict[str, Any]],
+) -> Tuple[str, List[str]]:
+    """Use only the last user turn so placeholder indices map to that turn's images."""
+    for msg in reversed(messages or []):
+        role = msg.get("role") or "user"
+        if role != "user":
+            continue
+
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            return content.strip(), []
+        if isinstance(content, dict):
+            content = [content]
+        if not isinstance(content, list):
+            return "", []
+
+        prompt_parts: List[str] = []
+        image_urls: List[str] = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+
+            item_type = item.get("type")
+            if item_type == "text":
+                text = item.get("text", "")
+                if isinstance(text, str) and text.strip():
+                    prompt_parts.append(text.strip())
+            elif item_type == "image_url":
+                image_data = item.get("image_url", {})
+                url = ""
+                if isinstance(image_data, dict):
+                    url = image_data.get("url", "")
+                elif isinstance(image_data, str):
+                    url = image_data
+                if isinstance(url, str) and url.strip():
+                    image_urls.append(url.strip())
+
+        prompt = "\n".join(prompt_parts).strip()
+        if not prompt and image_urls:
+            prompt = "Refer to the following content:"
+        return prompt, image_urls
+
+    return "", []
+
+
 def _extract_post_id_from_video_url(video_url: str) -> Optional[str]:
     if not isinstance(video_url, str) or not video_url:
         return None
@@ -870,10 +916,9 @@ class VideoService:
         else:
             show_think = reasoning_effort != "none"
 
-        from app.services.grok.services.chat import MessageExtractor
         from app.services.grok.utils.upload import UploadService
 
-        prompt, _, image_attachments = MessageExtractor.extract(messages)
+        prompt, image_attachments = _extract_last_user_prompt_and_images(messages)
 
         max_token_retries = max(1, int(get_config("retry.max_retry") or 1))
         last_error: Exception | None = None

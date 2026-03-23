@@ -250,7 +250,7 @@
 
   function parseReferenceUrls(value) {
     return (value || '')
-      .split(/\r?\n|,/)
+      .split(/\r?\n/)
       .map(item => item.trim())
       .filter(Boolean);
   }
