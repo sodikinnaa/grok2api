@@ -544,8 +544,8 @@ function openEditModal(index) {
 
     // 根据配置决定是否禁用 quota 编辑
     const quotaInput = byId('edit-quota');
-    const quotaInputParent = quotaInput?.closest('div');
-    const quotaLabel = quotaInputParent?.previousElementSibling;
+    const quotaField = quotaInput?.closest('div');
+    const quotaLabel = quotaField?.querySelector('label');
     if (consumedModeEnabled) {
       quotaInput.value = item.consumed || 0;
       quotaInput.disabled = true;
@@ -576,8 +576,8 @@ function openEditModal(index) {
 
     // 新建 Token 时启用 quota 编辑
     const newQuotaInput = byId('edit-quota');
-    const newQuotaInputParent = newQuotaInput?.closest('div');
-    const newQuotaLabel = newQuotaInputParent?.previousElementSibling;
+    const newQuotaField = newQuotaInput?.closest('div');
+    const newQuotaLabel = newQuotaField?.querySelector('label');
     newQuotaInput.disabled = false;
     newQuotaInput.classList.remove('bg-gray-100', 'text-gray-400');
     if (newQuotaLabel) newQuotaLabel.textContent = t('token.editQuota');

@@ -46,6 +46,8 @@ def _sanitize_token_text(value) -> str:
 @router.get("/tokens", dependencies=[Depends(verify_app_key)])
 async def get_tokens():
     """获取所有 Token"""
+    # 获取消耗模式配置
+    from app.core.config import get_config
     mgr = await get_token_manager()
     results = {}
     for pool_name, pool in mgr.pools.items():
