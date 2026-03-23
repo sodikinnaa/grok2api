@@ -28,7 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi import Depends  # noqa: E402
 
 from app.core.auth import verify_api_key  # noqa: E402
-from app.core.config import get_config  # noqa: E402
+from app.core.config import config, get_config  # noqa: E402
 from app.core.logger import logger, reload_logging_from_config, setup_logging  # noqa: E402
 from app.core.exceptions import register_exception_handlers  # noqa: E402
 from app.core.response_middleware import ResponseLoggerMiddleware  # noqa: E402
@@ -55,7 +55,7 @@ setup_logging(
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 1. 注册服务默认配置
-    from app.core.config import config, register_defaults
+    from app.core.config import register_defaults
     from app.services.grok.defaults import get_grok_defaults
 
     register_defaults(get_grok_defaults())

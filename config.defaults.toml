@@ -105,6 +105,8 @@ consumed_mode_enabled = false
 max_file_size_mb = 100
 # 最多保留日志文件数量，<=0 表示不限制
 max_files = 7
+# 是否记录健康检查请求
+log_health_requests = false
 # 是否记录所有请求（关闭时仅记录慢请求与错误请求）
 log_all_requests = false
 # 慢请求阈值（毫秒）

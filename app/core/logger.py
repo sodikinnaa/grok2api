@@ -179,9 +179,9 @@ def reload_logging_from_config(
         from app.core.config import get_config
 
         return setup_logging(
-            level=str(get_config("log.level", default_level)),
+            level=default_level,
             json_console=json_console,
-            file_logging=bool(get_config("log.file_enabled", True)),
+            file_logging=True,
             file_rotation_size_mb=get_config(
                 "log.max_file_size_mb", DEFAULT_LOG_MAX_FILE_SIZE_MB
             ),

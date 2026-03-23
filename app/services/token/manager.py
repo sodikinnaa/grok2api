@@ -14,7 +14,7 @@ from app.services.token.models import (
     BASIC__DEFAULT_QUOTA,
     SUPER_DEFAULT_QUOTA,
 )
-from app.core.storage import get_storage, LocalStorage
+from app.core.storage import LocalStorage, StorageError, get_storage
 from app.core.config import get_config
 from app.core.exceptions import UpstreamException
 from app.services.token.pool import TokenPool
@@ -31,6 +31,7 @@ DEFAULT_SAVE_DELAY_MS = 500
 DEFAULT_USAGE_FLUSH_INTERVAL_SEC = 5
 DEFAULT_ON_DEMAND_REFRESH_MIN_INTERVAL_SEC = 300
 DEFAULT_ON_DEMAND_REFRESH_MAX_TOKENS = 100
+DEFAULT_ON_DEMAND_REFRESH_LOCK_TIMEOUT_SEC = 5
 SUPER_WINDOW_THRESHOLD_SECONDS = 14400
 
 SUPER_POOL_NAME = "ssoSuper"
@@ -1146,12 +1147,33 @@ class TokenManager:
                 )
                 return {"checked": 0, "refreshed": 0, "recovered": 0, "expired": 0}
 
-            result = await self.refresh_cooling_tokens(
-                trigger="on_demand",
-                max_tokens=max_tokens,
-            )
-            self._last_on_demand_refresh_at = time.monotonic()
-            return result
+            storage = get_storage()
+            try:
+                async with storage.acquire_lock(
+                    "token_on_demand_refresh",
+                    timeout=DEFAULT_ON_DEMAND_REFRESH_LOCK_TIMEOUT_SEC,
+                ):
+                    # 先落盘本 worker 的脏状态，再重载其他 worker 的最新结果，
+                    # 避免按需刷新在多 worker 下基于过期内存视图重复执行。
+                    await self._save(force=True)
+                    await self.reload()
+
+                    result = await self.refresh_cooling_tokens(
+                        trigger="on_demand",
+                        max_tokens=max_tokens,
+                    )
+                    self._last_on_demand_refresh_at = time.monotonic()
+                    return result
+            except StorageError as exc:
+                logger.debug("On-demand refresh skipped: {}", exc)
+                try:
+                    await self.reload()
+                except Exception as reload_exc:
+                    logger.warning(
+                        "On-demand refresh reload after lock contention failed: {}",
+                        reload_exc,
+                    )
+                return {"checked": 0, "refreshed": 0, "recovered": 0, "expired": 0}
 
 
 # 便捷函数
