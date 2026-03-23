@@ -132,7 +132,6 @@ class ImageEditService:
                     response_format=response_format,
                     file_attachments=file_attachments,
                     tool_overrides=tool_overrides,
-                    request_overrides=request_overrides,
                 )
                 try:
                     effort = (
@@ -199,9 +198,9 @@ class ImageEditService:
         response_format: str,
         file_attachments: List[str],
         tool_overrides: dict,
-        request_overrides: dict,
     ) -> List[str]:
-        calls_needed = (n + 1) // 2
+        per_call = 2
+        calls_needed = max(1, (n + per_call - 1) // per_call)
 
         async def _call_edit():
             response = await GrokChatService().chat(
@@ -212,7 +211,7 @@ class ImageEditService:
                 stream=True,
                 file_attachments=file_attachments,
                 tool_overrides=tool_overrides,
-                request_overrides=request_overrides,
+                request_overrides=self._build_request_overrides(per_call),
             )
             processor = ImageCollectProcessor(
                 "grok-imagine-1.0-edit", token, response_format=response_format
