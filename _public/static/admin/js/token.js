@@ -18,6 +18,7 @@ const byId = (id) => document.getElementById(id);
 const qsa = (selector) => document.querySelectorAll(selector);
 const DEFAULT_QUOTA_BASIC = 80;
 const DEFAULT_QUOTA_SUPER = 140;
+const VIDEO_QUOTA_DIVISOR = 4;
 
 function getDefaultQuotaForPool(pool) {
   return pool === 'ssoSuper' ? DEFAULT_QUOTA_SUPER : DEFAULT_QUOTA_BASIC;
@@ -214,7 +215,9 @@ function updateStats(data) {
   });
 
   const imageQuota = Math.floor(chatQuota / 2);
+  const videoQuota = Math.floor(chatQuota / VIDEO_QUOTA_DIVISOR);
   const totalConsumed = flatTokens.reduce((sum, t) => sum + (t.consumed || 0), 0);
+  const videoConsumed = Math.floor(totalConsumed / VIDEO_QUOTA_DIVISOR);
 
   // 更新统计卡片 (这些不受 consumedMode 影响)
   setText('stat-total', totalTokens.toLocaleString());
@@ -226,13 +229,23 @@ function updateStats(data) {
   if (consumedModeEnabled) {
     setText('stat-chat-quota', totalConsumed.toLocaleString());
     setText('stat-image-quota', Math.floor(totalConsumed / 2).toLocaleString());
+    setText('stat-video-quota', videoConsumed.toLocaleString());
     const chatLabel = document.querySelector('[data-i18n="token.statChatQuota"]');
     const imageLabel = document.querySelector('[data-i18n="token.statImageQuota"]');
+    const videoLabel = document.querySelector('[data-i18n="token.statVideoQuota"]');
     if (chatLabel) chatLabel.textContent = t('token.statChatConsumed');
     if (imageLabel) imageLabel.textContent = t('token.statImageConsumed');
+    if (videoLabel) videoLabel.textContent = t('token.statVideoConsumed');
   } else {
     setText('stat-chat-quota', chatQuota.toLocaleString());
     setText('stat-image-quota', imageQuota.toLocaleString());
+    setText('stat-video-quota', videoQuota.toLocaleString());
+    const chatLabel = document.querySelector('[data-i18n="token.statChatQuota"]');
+    const imageLabel = document.querySelector('[data-i18n="token.statImageQuota"]');
+    const videoLabel = document.querySelector('[data-i18n="token.statVideoQuota"]');
+    if (chatLabel) chatLabel.textContent = t('token.statChatQuota');
+    if (imageLabel) imageLabel.textContent = t('token.statImageQuota');
+    if (videoLabel) videoLabel.textContent = t('token.statVideoQuota');
   }
 
   setText('stat-total-calls', totalCalls.toLocaleString());
