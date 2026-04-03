@@ -1469,10 +1469,15 @@ class VideoCollectProcessor:
                     self.token, final_video_url
                 )
 
-            content = await self._get_dl().render_video(
+            final_video_url, final_thumbnail_url = await self._get_dl().resolve_video_output(
                 final_video_url,
                 self.token,
                 result.thumbnail_url,
+            )
+            content = await self._get_dl().render_video(
+                final_video_url,
+                self.token,
+                final_thumbnail_url,
             )
 
             return {
@@ -1487,6 +1492,7 @@ class VideoCollectProcessor:
                             "role": "assistant",
                             "content": content,
                             "refusal": None,
+                            "video_url": final_video_url,
                         },
                         "finish_reason": "stop",
                     }
