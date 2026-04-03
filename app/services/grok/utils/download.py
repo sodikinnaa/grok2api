@@ -35,6 +35,15 @@ class DownloadService:
         self.video_dir.mkdir(parents=True, exist_ok=True)
         self._cleanup_running = False
 
+    def _build_local_cache_url(self, file_path: str, media_type: str) -> str:
+        normalized_path = self._normalize_path(file_path)
+        cache_key = urlparse(normalized_path).path or normalized_path
+        filename = cache_key.lstrip("/").replace("/", "-")
+
+        app_url = get_config("app.app_url")
+        base = f"{app_url.rstrip('/')}" if app_url else ""
+        return f"{base}/v1/files/{media_type}/{filename}"
+
     async def create(self) -> ResettableSession:
         """Create or reuse a session."""
         if self._session is None:
@@ -100,7 +109,23 @@ class DownloadService:
         fmt = fmt.lower() if isinstance(fmt, str) else "url"
         if fmt not in ("url", "markdown", "html"):
             fmt = "url"
-        final_video_url = await self.resolve_url(video_url, token, "video")
+
+        final_video_url = video_url
+        try:
+            parsed_video = urlparse(video_url)
+            should_mirror_video = (
+                (parsed_video.scheme in ("http", "https") and parsed_video.netloc == "assets.grok.com")
+                or (not parsed_video.scheme and not parsed_video.netloc)
+            )
+            if should_mirror_video:
+                await self.download_file(video_url, token, "video")
+                final_video_url = self._build_local_cache_url(video_url, "video")
+            else:
+                final_video_url = await self.resolve_url(video_url, token, "video")
+        except Exception as e:
+            logger.warning(f"Video mirror failed, fallback to upstream URL: {e}")
+            final_video_url = await self.resolve_url(video_url, token, "video")
+
         final_thumb_url = ""
         if thumbnail_url:
             final_thumb_url = await self.resolve_url(thumbnail_url, token, "image")

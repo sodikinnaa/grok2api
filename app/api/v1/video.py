@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import orjson
 from fastapi import APIRouter, Request, UploadFile
+from urllib.parse import urlparse
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.datastructures import UploadFile as StarletteUploadFile
@@ -103,6 +104,19 @@ def _extract_video_url(content: str) -> str:
         return url_match.group(0).strip().rstrip(".,)")
 
     return ""
+
+
+def _normalize_local_file_url(url: str, request: Request) -> str:
+    if not isinstance(url, str) or not url.strip():
+        return url
+
+    parsed = urlparse(url)
+    if parsed.scheme or parsed.netloc:
+        return url
+    if not url.startswith("/v1/files/"):
+        return url
+
+    return str(request.base_url).rstrip("/") + url
 
 
 def _normalize_model(model: Optional[str]) -> str:
@@ -382,6 +396,7 @@ async def _create_video_from_payload(
     payload: BaseModel,
     references: List[str],
     *,
+    request: Request,
     require_extension: bool = False,
 ) -> JSONResponse:
     prompt = (payload.prompt or "").strip()
@@ -427,6 +442,8 @@ async def _create_video_from_payload(
     video_url = _extract_video_url(rendered)
     if not video_url:
         raise UpstreamException("Video generation failed: missing video URL")
+
+    video_url = _normalize_local_file_url(video_url, request)
 
     return JSONResponse(
         content=_build_create_response(
@@ -481,7 +498,7 @@ async def create_video(request: Request):
             _raise_validation_error(exc)
         references = await _build_references_for_json(payload)
         return await _create_video_from_payload(
-            payload, references, require_extension=False
+            payload, references, request=request, require_extension=False
         )
 
     form = await request.form()
@@ -496,7 +513,7 @@ async def create_video(request: Request):
         input_reference=form.get("input_reference"),
     )
     return await _create_video_from_payload(
-        payload, references, require_extension=False
+        payload, references, request=request, require_extension=False
     )
 
 
