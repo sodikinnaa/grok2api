@@ -1,23 +1,38 @@
-# Grok2API
+# Grok2API Fork
 
-**中文** | [English](docs/README.en.md) | [文档](https://blog.cheny.me/blog/posts/grok2api)
+**Bahasa Indonesia** | [English](docs/README.en.md)
+
+Fork ini berbasis proyek asli [`chenyme/grok2api`](https://github.com/chenyme/grok2api) dan disesuaikan agar lebih mudah dipakai oleh pengguna Indonesia.
 
 > [!NOTE]
-> 本项目仅供学习与研究，使用者必须在遵循 Grok 的 **使用条款** 以及 **法律法规** 的情况下使用，不得用于非法用途。
+> Proyek ini ditujukan untuk pembelajaran dan riset. Penggunaan tetap harus mematuhi **Terms of Use Grok/xAI** serta hukum dan regulasi yang berlaku. Jangan gunakan untuk aktivitas ilegal.
 
 > [!NOTE]
-> 开源项目欢迎大家支持二开和PR，但请保留原作者标识和前端标识，尊重他人劳动成果～！
+> Fork ini tetap menghormati karya upstream. Jika melakukan modifikasi lanjutan atau membuka pull request, pertahankan atribusi yang relevan terhadap proyek asli.
 
-基于 **FastAPI** 重构的 Grok2API，全面适配最新 Web 调用格式，支持流/非流式对话、工具调用、图像生成/编辑、视频生成/超分（文生视频 / 图生视频）、深度思考，号池并发与自动负载均衡一体化。
+Grok2API adalah server **FastAPI** yang membungkus akses Grok berbasis web menjadi endpoint API yang lebih nyaman dipakai. Project ini mendukung chat streaming/non-streaming, tool call, image generation/editing, video generation/upscale, deep reasoning, token pool concurrency, dan automatic load balancing.
+
+## Ringkasan
+
+- API kompatibel gaya OpenAI untuk Grok
+- Mendukung chat, image, video, dan reasoning
+- Ada panel admin untuk mengelola token, config, dan cache
+- Cocok untuk self-hosting lokal, Docker Compose, Vercel, dan Render
+- Fork ini menambahkan dokumentasi utama berbahasa Indonesia
+
+## Perbedaan fork ini
+
+- README utama diarahkan untuk pembaca Indonesia
+- Tetap kompatibel dengan struktur dan fungsi upstream
+- Referensi upstream dipertahankan agar alur update tetap jelas
 
 <img width="4800" height="4200" alt="image" src="https://github.com/user-attachments/assets/a6669674-8afe-4ae5-bf81-a2ec1f864233" />
 
 <br>
 
-## 快速开始
-> [文档](https://blog.cheny.me/blog/posts/grok2api)
+## Memulai Cepat
 
-### 本地开发
+### Jalankan lokal
 
 ```bash
 uv sync
@@ -28,37 +43,37 @@ uv run granian --interface asgi --host 0.0.0.0 --port 8000 --workers 1 main:app
 ### Docker Compose
 
 ```bash
-git clone https://github.com/chenyme/grok2api
+git clone git@github.com:sodikinnaa/grok2api-fork.git
 
-cd grok2api
+cd grok2api-fork
 
 docker compose up -d
 ```
 
-> Docker Compose 端口变量：
+> Variabel port Docker Compose:
 >
-> - `SERVER_PORT`：容器内应用监听端口
-> - `HOST_PORT`：宿主机映射端口（仅 Docker Compose 使用）
+> - `SERVER_PORT`: port yang didengarkan aplikasi di dalam container
+> - `HOST_PORT`: port yang dipublikasikan ke host
 >
-> 小贴士：端口映射规则是 `HOST_PORT:SERVER_PORT`，你访问的是 `HOST_PORT`，容器内服务实际监听的是 `SERVER_PORT`。
+> Format mapping-nya adalah `HOST_PORT:SERVER_PORT`. Jadi yang kamu akses dari browser/client adalah `HOST_PORT`, sedangkan aplikasi di dalam container tetap mendengarkan di `SERVER_PORT`.
 >
-> 示例：`HOST_PORT=9000 SERVER_PORT=8011 docker compose up -d`，访问 `http://localhost:9000`。
+> Contoh: `HOST_PORT=9000 SERVER_PORT=8011 docker compose up -d`, lalu akses `http://localhost:9000`.
 
-### Vercel 部署
+### Deploy ke Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/chenyme/grok2api&env=LOG_LEVEL,LOG_FILE_ENABLED,DATA_DIR,SERVER_STORAGE_TYPE,SERVER_STORAGE_URL&envDefaults=%7B%22DATA_DIR%22%3A%22/tmp/data%22%2C%22LOG_FILE_ENABLED%22%3A%22false%22%2C%22LOG_LEVEL%22%3A%22INFO%22%2C%22SERVER_STORAGE_TYPE%22%3A%22local%22%2C%22SERVER_STORAGE_URL%22%3A%22%22%7D)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/sodikinnaa/grok2api-fork&env=LOG_LEVEL,LOG_FILE_ENABLED,DATA_DIR,SERVER_STORAGE_TYPE,SERVER_STORAGE_URL&envDefaults=%7B%22DATA_DIR%22%3A%22/tmp/data%22%2C%22LOG_FILE_ENABLED%22%3A%22false%22%2C%22LOG_LEVEL%22%3A%22INFO%22%2C%22SERVER_STORAGE_TYPE%22%3A%22local%22%2C%22SERVER_STORAGE_URL%22%3A%22%22%7D)
 
-> 请务必设置 `DATA_DIR=/tmp/data` 并关闭文件日志 `LOG_FILE_ENABLED=false`。
+> Wajib set `DATA_DIR=/tmp/data` dan nonaktifkan file log dengan `LOG_FILE_ENABLED=false`.
 >
-> 持久化请使用 MySQL / Redis / PostgreSQL，并设置：`SERVER_STORAGE_TYPE` 与 `SERVER_STORAGE_URL`。
+> Untuk penyimpanan persisten, gunakan MySQL / Redis / PostgreSQL lalu set `SERVER_STORAGE_TYPE` dan `SERVER_STORAGE_URL`.
 
-### Render 部署
+### Deploy ke Render
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/chenyme/grok2api)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/sodikinnaa/grok2api-fork)
 
-> Render 免费实例 15 分钟无访问会休眠；重启/重新部署会丢失数据。
+> Instance gratis Render akan sleep setelah 15 menit tanpa trafik; restart atau redeploy juga bisa menghilangkan data lokal.
 >
-> 持久化请使用 MySQL / Redis / PostgreSQL，并设置：`SERVER_STORAGE_TYPE` 与 `SERVER_STORAGE_URL`。
+> Untuk penyimpanan persisten, gunakan MySQL / Redis / PostgreSQL lalu set `SERVER_STORAGE_TYPE` dan `SERVER_STORAGE_URL`.
 
 <br>
 
