@@ -125,7 +125,14 @@ def _extract_response_video_url(result: Dict[str, Any], request: Request) -> str
         raise UpstreamException("Video generation failed: empty result")
 
     msg = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
-    rendered = msg.get("content", "") if isinstance(msg, dict) else ""
+    if isinstance(msg, dict):
+        direct_video_url = msg.get("video_url", "")
+        if isinstance(direct_video_url, str) and direct_video_url.strip():
+            return _normalize_local_file_url(direct_video_url.strip(), request)
+        rendered = msg.get("content", "")
+    else:
+        rendered = ""
+
     video_url = _extract_video_url(rendered)
     if not video_url:
         raise UpstreamException("Video generation failed: missing video URL")

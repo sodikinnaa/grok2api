@@ -110,14 +110,9 @@ class DownloadService:
             final_url = await self.resolve_url(url, token, "image")
             return f"![{image_id}]({final_url})"
 
-    async def render_video(
+    async def resolve_video_output(
         self, video_url: str, token: str, thumbnail_url: str = ""
-    ) -> str:
-        fmt = get_config("app.video_format")
-        fmt = fmt.lower() if isinstance(fmt, str) else "url"
-        if fmt not in ("url", "markdown", "html"):
-            fmt = "url"
-
+    ) -> Tuple[str, str]:
         final_video_url = video_url
         try:
             parsed_video = urlparse(video_url)
@@ -137,6 +132,19 @@ class DownloadService:
         final_thumb_url = ""
         if thumbnail_url:
             final_thumb_url = await self.resolve_url(thumbnail_url, token, "image")
+        return final_video_url, final_thumb_url
+
+    async def render_video(
+        self, video_url: str, token: str, thumbnail_url: str = ""
+    ) -> str:
+        fmt = get_config("app.video_format")
+        fmt = fmt.lower() if isinstance(fmt, str) else "url"
+        if fmt not in ("url", "markdown", "html"):
+            fmt = "url"
+
+        final_video_url, final_thumb_url = await self.resolve_video_output(
+            video_url, token, thumbnail_url
+        )
         if fmt == "url":
             return f"{final_video_url}\n"
         if fmt == "markdown":

@@ -105,13 +105,14 @@ def test_download_service_resolve_url_mirrors_assets_url_with_explicit_port(monk
     ]
 
 
-def test_videos_endpoint_returns_absolute_local_file_url(monkeypatch):
+def test_videos_endpoint_prefers_direct_local_file_url(monkeypatch):
     async def fake_completions(**kwargs):
         return {
             "choices": [
                 {
                     "message": {
-                        "content": "[video](/v1/files/video/generated-test-video.mp4)"
+                        "video_url": "/v1/files/video/generated-test-video.mp4",
+                        "content": "[video](https://upstream.example/ignored.mp4)",
                     }
                 }
             ]
@@ -146,6 +147,37 @@ def test_videos_endpoint_returns_absolute_local_file_url(monkeypatch):
         "quality": "standard",
         "url": "http://testserver/v1/files/video/generated-test-video.mp4",
     }
+
+
+def test_videos_endpoint_falls_back_to_content_when_direct_url_missing(monkeypatch):
+    async def fake_completions(**kwargs):
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": "[video](/v1/files/video/generated-test-video.mp4)"
+                    }
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        "app.api.v1.video.VideoService.completions",
+        fake_completions,
+    )
+
+    client = TestClient(create_app())
+    response = client.post(
+        "/v1/videos",
+        json={
+            "model": "grok-imagine-1.0-video",
+            "prompt": "seekor kucing sedang jogging",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["url"] == "http://testserver/v1/files/video/generated-test-video.mp4"
 
 
 def test_videos_endpoint_falls_back_to_upstream_url_when_not_local(monkeypatch):
