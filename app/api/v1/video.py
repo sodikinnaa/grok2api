@@ -119,6 +119,20 @@ def _normalize_local_file_url(url: str, request: Request) -> str:
     return str(request.base_url).rstrip("/") + url
 
 
+def _extract_response_video_url(result: Dict[str, Any], request: Request) -> str:
+    choices = result.get("choices") if isinstance(result, dict) else None
+    if not isinstance(choices, list) or not choices:
+        raise UpstreamException("Video generation failed: empty result")
+
+    msg = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+    rendered = msg.get("content", "") if isinstance(msg, dict) else ""
+    video_url = _extract_video_url(rendered)
+    if not video_url:
+        raise UpstreamException("Video generation failed: missing video URL")
+
+    return _normalize_local_file_url(video_url, request)
+
+
 def _normalize_model(model: Optional[str]) -> str:
     requested = (model or VIDEO_MODEL_ID).strip()
     if requested != VIDEO_MODEL_ID:
@@ -433,17 +447,7 @@ async def _create_video_from_payload(
         preset="custom",
     )
 
-    choices = result.get("choices") if isinstance(result, dict) else None
-    if not isinstance(choices, list) or not choices:
-        raise UpstreamException("Video generation failed: empty result")
-
-    msg = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
-    rendered = msg.get("content", "") if isinstance(msg, dict) else ""
-    video_url = _extract_video_url(rendered)
-    if not video_url:
-        raise UpstreamException("Video generation failed: missing video URL")
-
-    video_url = _normalize_local_file_url(video_url, request)
+    video_url = _extract_response_video_url(result, request)
 
     return JSONResponse(
         content=_build_create_response(

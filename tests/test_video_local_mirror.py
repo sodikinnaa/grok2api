@@ -68,4 +68,49 @@ def test_videos_endpoint_returns_absolute_local_file_url(monkeypatch):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["url"] == "http://testserver/v1/files/video/generated-test-video.mp4"
+    assert payload == {
+        "id": payload["id"],
+        "object": "video",
+        "created_at": payload["created_at"],
+        "completed_at": payload["completed_at"],
+        "status": "completed",
+        "model": "grok-imagine-1.0-video",
+        "prompt": "seekor kucing sedang jogging",
+        "size": "1792x1024",
+        "seconds": "6",
+        "quality": "standard",
+        "url": "http://testserver/v1/files/video/generated-test-video.mp4",
+    }
+
+
+def test_videos_endpoint_falls_back_to_upstream_url_when_not_local(monkeypatch):
+    upstream_url = "https://example.test/video.mp4"
+
+    async def fake_completions(**kwargs):
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": f"[video]({upstream_url})"
+                    }
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        "app.api.v1.video.VideoService.completions",
+        fake_completions,
+    )
+
+    client = TestClient(create_app())
+    response = client.post(
+        "/v1/videos",
+        json={
+            "model": "grok-imagine-1.0-video",
+            "prompt": "seekor kucing sedang jogging",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["url"] == upstream_url
