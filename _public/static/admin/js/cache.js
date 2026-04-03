@@ -1189,8 +1189,17 @@ function renderLocalCacheList(type, items) {
     const tdName = document.createElement('td');
     tdName.className = 'text-left';
     const nameWrap = document.createElement('div');
-    nameWrap.className = 'flex items-center gap-2';
-    if (item.preview_url) {
+    nameWrap.className = 'cache-file-cell';
+
+    if (type === 'video' && item.view_url) {
+      const video = document.createElement('video');
+      video.src = item.view_url;
+      video.className = 'cache-preview cache-preview-video';
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      nameWrap.appendChild(video);
+    } else if (item.preview_url) {
       const img = document.createElement('img');
       img.src = item.preview_url;
       img.alt = '';
@@ -1199,10 +1208,28 @@ function renderLocalCacheList(type, items) {
       img.decoding = 'async';
       nameWrap.appendChild(img);
     }
-    const nameText = document.createElement('span');
-    nameText.className = 'font-mono text-xs text-gray-500';
+
+    const metaWrap = document.createElement('div');
+    metaWrap.className = 'min-w-0';
+    const nameText = document.createElement('div');
+    nameText.className = 'font-mono text-xs text-gray-500 break-all';
     nameText.textContent = item.name;
-    nameWrap.appendChild(nameText);
+    metaWrap.appendChild(nameText);
+
+    const metaRow = document.createElement('div');
+    metaRow.className = 'cache-file-meta';
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'cache-type-badge';
+    typeBadge.textContent = (item.extension || type).toUpperCase();
+    metaRow.appendChild(typeBadge);
+    if (type === 'video') {
+      const hint = document.createElement('span');
+      hint.className = 'text-xs text-[var(--accents-4)]';
+      hint.textContent = t('cache.videoCacheLabel');
+      metaRow.appendChild(hint);
+    }
+    metaWrap.appendChild(metaRow);
+    nameWrap.appendChild(metaWrap);
     tdName.appendChild(nameWrap);
 
     const tdSize = document.createElement('td');
@@ -1221,6 +1248,13 @@ function renderLocalCacheList(type, items) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path>
             <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </button>
+        <button class="cache-icon-button" onclick="downloadLocalFile('${type}', '${item.name}')" title="${t('common.download')}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
         </button>
         <button class="cache-icon-button" onclick="deleteLocalFile('${type}', '${item.name}')" title="${t('common.delete')}">
@@ -1245,10 +1279,24 @@ function renderLocalCacheList(type, items) {
   updateSelectedCount();
 }
 
-function viewLocalFile(type, name) {
+function buildLocalFileUrl(type, name) {
   const safeName = encodeURIComponent(name);
-  const url = type === 'image' ? `/v1/files/image/${safeName}` : `/v1/files/video/${safeName}`;
-  window.open(url, '_blank');
+  return type === 'image' ? `/v1/files/image/${safeName}` : `/v1/files/video/${safeName}`;
+}
+
+function viewLocalFile(type, name) {
+  window.open(buildLocalFileUrl(type, name), '_blank');
+}
+
+function downloadLocalFile(type, name) {
+  const link = document.createElement('a');
+  link.href = buildLocalFileUrl(type, name);
+  link.download = name;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 async function deleteLocalFile(type, name) {
