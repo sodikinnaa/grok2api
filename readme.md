@@ -77,78 +77,78 @@ docker compose up -d
 
 <br>
 
-## 管理面板
+## Panel Admin
 
-- 访问地址：`http://<host>:<port>/admin`（本地运行使用 `SERVER_PORT`，Docker Compose 使用 `HOST_PORT`，默认均为 `8000`）
-- 默认密码：`grok2api`（配置项 `app.app_key`，建议修改）
+- Alamat akses: `http://<host>:<port>/admin` (untuk menjalankan lokal gunakan `SERVER_PORT`, untuk Docker Compose gunakan `HOST_PORT`, default keduanya `8000`)
+- Password default: `grok2api` (opsi konfigurasi `app.app_key`, disarankan untuk diubah)
 
-**功能说明**：
+**Penjelasan fitur**：
 
-- **Token 管理**：导入/添加/删除 Token，查看状态和配额
-- **状态筛选**：按状态（正常/限流/失效）或 NSFW 状态筛选
-- **批量操作**：批量刷新、导出、删除、开启 NSFW
-- **NSFW 开启**：一键为 Token 开启 Unhinged 模式（需代理或 `cf_clearance`）
-- **配置管理**：在线修改系统配置
-- **缓存管理**：查看和清理媒体缓存
+- **Manajemen Token**: impor/tambah/hapus Token, lihat status dan kuota
+- **Filter status**: filter berdasarkan status (normal/rate limit/tidak valid) atau status NSFW
+- **Operasi massal**: refresh, export, hapus, atau aktifkan NSFW secara massal
+- **Aktivasi NSFW**: aktifkan mode Unhinged untuk Token dengan satu klik (memerlukan proxy atau `cf_clearance`)
+- **Manajemen konfigurasi**: ubah konfigurasi sistem secara online
+- **Manajemen cache**: lihat dan bersihkan cache media
 
 <br>
 
-## 环境变量
+## Variabel Lingkungan
 
-> 配置 `.env` 文件
+> Konfigurasikan file `.env`
 
-| 变量名 | 说明 | 默认值 | 示例 |
+| Nama variabel | Keterangan | Nilai default | Contoh |
 | :-- | :-- | :-- | :-- |
-| `LOG_LEVEL` | 日志级别 | `INFO` | `DEBUG` |
-| `LOG_FILE_ENABLED` | 是否启用文件日志 | `true` | `false` |
-| `DATA_DIR` | 数据目录（配置/Token/锁） | `./data` | `/data` |
-| `SERVER_HOST` | 服务监听地址 | `0.0.0.0` | `0.0.0.0` |
-| `SERVER_PORT` | 服务端口 | `8000` | `8000` |
-| `HOST_PORT` | Docker Compose 宿主机映射端口 | `8000` | `9000` |
-| `SERVER_WORKERS` | 服务进程数量 | `1` | `2` |
-| `SERVER_STORAGE_TYPE` | 存储类型（`local`/`redis`/`mysql`/`pgsql`） | `local` | `pgsql` |
-| `SERVER_STORAGE_URL` | 存储连接串（local 时可为空） | `""` | `postgresql+asyncpg://user:password@host:5432/db` |
+| `LOG_LEVEL` | Level log | `INFO` | `DEBUG` |
+| `LOG_FILE_ENABLED` | Apakah file log diaktifkan | `true` | `false` |
+| `DATA_DIR` | Direktori data (konfigurasi/Token/lock) | `./data` | `/data` |
+| `SERVER_HOST` | Alamat listen service | `0.0.0.0` | `0.0.0.0` |
+| `SERVER_PORT` | Port service | `8000` | `8000` |
+| `HOST_PORT` | Port mapping host untuk Docker Compose | `8000` | `9000` |
+| `SERVER_WORKERS` | Jumlah proses service | `1` | `2` |
+| `SERVER_STORAGE_TYPE` | Tipe storage (`local`/`redis`/`mysql`/`pgsql`) | `local` | `pgsql` |
+| `SERVER_STORAGE_URL` | Connection string storage (boleh kosong jika `local`) | `""` | `postgresql+asyncpg://user:password@host:5432/db` |
 
-> MySQL 示例：`mysql+aiomysql://user:password@host:3306/db`（若填 `mysql://` 会自动转为 `mysql+aiomysql://`）
-
-<br>
-
-## 可用次数
-
-- Basic 账号：80 次 / 20h
-- Super 账号：140 次 / 2h
+> Contoh MySQL: `mysql+aiomysql://user:password@host:3306/db` (jika mengisi `mysql://`, akan otomatis dikonversi menjadi `mysql+aiomysql://`)
 
 <br>
 
-## 可用模型
+## Jumlah Penggunaan Tersedia
 
-| 模型名 | 计次 | 可用账号 | 对话功能 | 图像功能 | 视频功能 |
+- Akun Basic: 80 kali / 20h
+- Akun Super: 140 kali / 2h
+
+<br>
+
+## Model yang Tersedia
+
+| Nama model | Hitungan penggunaan | Akun yang tersedia | Fitur percakapan | Fitur gambar | Fitur video |
 | :-- | :--: | :-- | :--: | :--: | :--: |
-| `grok-3` | 1 | Basic/Super | 支持 | 支持 | - |
-| `grok-3-mini` | 1 | Basic/Super | 支持 | 支持 | - |
-| `grok-3-thinking` | 1 | Basic/Super | 支持 | 支持 | - |
-| `grok-4` | 1 | Basic/Super | 支持 | 支持 | - |
-| `grok-4-thinking` | 1 | Basic/Super | 支持 | 支持 | - |
-| `grok-4-heavy` | 4 | Super | 支持 | 支持 | - |
-| `grok-4.1-mini` | 1 | Basic/Super | 支持 | 支持 | - |
-| `grok-4.1-fast` | 1 | Basic/Super | 支持 | 支持 | - |
-| `grok-4.1-expert` | 4 | Basic/Super | 支持 | 支持 | - |
-| `grok-4.1-thinking` | 4 | Basic/Super | 支持 | 支持 | - |
-| `grok-4.20-beta` | 1 | Basic/Super | 支持 | 支持 | - |
-| `grok-imagine-1.0` | - | Basic/Super | - | 支持 | - |
-| `grok-imagine-1.0-fast` | - | Basic/Super | - | 支持 | - |
-| `grok-imagine-1.0-edit` | - | Basic/Super | - | 支持 | - |
-| `grok-imagine-1.0-video` | - | Basic/Super | - | - | 支持 |
+| `grok-3` | 1 | Basic/Super | Didukung | Didukung | - |
+| `grok-3-mini` | 1 | Basic/Super | Didukung | Didukung | - |
+| `grok-3-thinking` | 1 | Basic/Super | Didukung | Didukung | - |
+| `grok-4` | 1 | Basic/Super | Didukung | Didukung | - |
+| `grok-4-thinking` | 1 | Basic/Super | Didukung | Didukung | - |
+| `grok-4-heavy` | 4 | Super | Didukung | Didukung | - |
+| `grok-4.1-mini` | 1 | Basic/Super | Didukung | Didukung | - |
+| `grok-4.1-fast` | 1 | Basic/Super | Didukung | Didukung | - |
+| `grok-4.1-expert` | 4 | Basic/Super | Didukung | Didukung | - |
+| `grok-4.1-thinking` | 4 | Basic/Super | Didukung | Didukung | - |
+| `grok-4.20-beta` | 1 | Basic/Super | Didukung | Didukung | - |
+| `grok-imagine-1.0` | - | Basic/Super | - | Didukung | - |
+| `grok-imagine-1.0-fast` | - | Basic/Super | - | Didukung | - |
+| `grok-imagine-1.0-edit` | - | Basic/Super | - | Didukung | - |
+| `grok-imagine-1.0-video` | - | Basic/Super | - | - | Didukung |
 
 <br>
 
-## 接口说明
+## Penjelasan Endpoint
 
-> 以下示例默认使用 `localhost:8000`；若 Docker Compose 设置了 `HOST_PORT`，请替换为对应端口。
+> Contoh di bawah secara default menggunakan `localhost:8000`; jika Docker Compose mengatur `HOST_PORT`, ganti dengan port yang sesuai.
 
 ### `POST /v1/chat/completions`
 
-> 通用接口，支持对话聊天、图像生成、图像编辑、视频生成、视频超分
+> Endpoint umum, mendukung chat, image generation, image editing, video generation, dan video upscaling
 
 ```bash
 curl http://localhost:8000/v1/chat/completions \
@@ -161,60 +161,60 @@ curl http://localhost:8000/v1/chat/completions \
 ```
 
 <details>
-<summary>支持的请求参数</summary>
+<summary>Parameter request yang didukung</summary>
 
 <br>
 
-| 字段 | 类型 | 说明 | 可用参数 |
+| Field | Tipe | Keterangan | Parameter yang tersedia |
 | :-- | :-- | :-- | :-- |
-| `model` | string | 模型名称 | 见上方模型列表 |
-| `messages` | array | 消息列表 | 见下方消息格式 |
-| `stream` | boolean | 是否开启流式输出 | `true`, `false` |
-| `reasoning_effort` | string | 推理强度 | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` |
-| `temperature` | number | 采样温度 | `0` ~ `2` |
-| `top_p` | number | nucleus 采样 | `0` ~ `1` |
-| `tools` | array | 工具定义 | OpenAI function tools |
-| `tool_choice` | string/object | 工具选择 | `auto`, `required`, `none` 或指定工具 |
-| `parallel_tool_calls` | boolean | 是否允许并行工具调用 | `true`, `false` |
-| `video_config` | object | **视频模型专用配置对象** | 支持：`grok-imagine-1.0-video` |
-| └─`aspect_ratio` | string | 视频宽高比 | `16:9`, `9:16`, `1:1`, `2:3`, `3:2`, `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
-| └─`video_length` | integer | 视频时长 (秒) | `6` ~ `30` |
-| └─`resolution_name` | string | 分辨率 | `480p`, `720p` |
-| └─`preset` | string | 风格预设 | `fun`, `normal`, `spicy`, `custom` |
-| `image_config` | object | **图片模型专用配置对象** | 支持：`grok-imagine-1.0` / `grok-imagine-1.0-fast` / `grok-imagine-1.0-edit` |
-| └─`n` | integer | 生成数量 | `1` ~ `10` |
-| └─`size` | string | 图片尺寸 | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
-| └─`response_format` | string | 响应格式 | `url`, `b64_json`, `base64` |
+| `model` | string | Nama model | Lihat daftar model di atas |
+| `messages` | array | Daftar pesan | Lihat format pesan di bawah |
+| `stream` | boolean | Apakah mengaktifkan output streaming | `true`, `false` |
+| `reasoning_effort` | string | Tingkat reasoning | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` |
+| `temperature` | number | Temperatur sampling | `0` ~ `2` |
+| `top_p` | number | Nucleus sampling | `0` ~ `1` |
+| `tools` | array | Definisi tool | OpenAI function tools |
+| `tool_choice` | string/object | Pemilihan tool | `auto`, `required`, `none` atau tool tertentu |
+| `parallel_tool_calls` | boolean | Apakah mengizinkan pemanggilan tool paralel | `true`, `false` |
+| `video_config` | object | **Objek konfigurasi khusus model video** | Mendukung: `grok-imagine-1.0-video` |
+| └─`aspect_ratio` | string | Rasio aspek video | `16:9`, `9:16`, `1:1`, `2:3`, `3:2`, `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
+| └─`video_length` | integer | Durasi video (detik) | `6` ~ `30` |
+| └─`resolution_name` | string | Resolusi | `480p`, `720p` |
+| └─`preset` | string | Preset gaya | `fun`, `normal`, `spicy`, `custom` |
+| `image_config` | object | **Objek konfigurasi khusus model gambar** | Mendukung: `grok-imagine-1.0` / `grok-imagine-1.0-fast` / `grok-imagine-1.0-edit` |
+| └─`n` | integer | Jumlah generasi | `1` ~ `10` |
+| └─`size` | string | Ukuran gambar | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
+| └─`response_format` | string | Format respons | `url`, `b64_json`, `base64` |
 
-**消息格式 (messages)**：
+**Format pesan (messages)**：
 
-| 字段 | 类型 | 说明 |
+| Field | Tipe | Keterangan |
 | :-- | :-- | :-- |
-| `role` | string | 角色：`developer`, `system`, `user`, `assistant` |
-| `content` | string/array | 消息内容，支持纯文本或多模态数组 |
+| `role` | string | Peran: `developer`, `system`, `user`, `assistant` |
+| `content` | string/array | Isi pesan, mendukung teks biasa atau array multimodal |
 
-**多模态内容块类型 (content array)**：
+**Tipe blok konten multimodal (content array)**：
 
-| type | 说明 | 示例 |
+| type | Keterangan | Contoh |
 | :-- | :-- | :-- |
-| `text` | 文本内容 | `{"type": "text", "text": "描述这张图片"}` |
-| `image_url` | 图片 URL | `{"type": "image_url", "image_url": {"url": "https://..."}}` |
-| `input_audio` | 音频 | `{"type": "input_audio", "input_audio": {"data": "https://..."}}` |
-| `file` | 文件 | `{"type": "file", "file": {"file_data": "https://..."}}` |
+| `text` | Konten teks | `{"type": "text", "text": "Deskripsikan gambar ini"}` |
+| `image_url` | URL gambar | `{"type": "image_url", "image_url": {"url": "https://..."}}` |
+| `input_audio` | Audio | `{"type": "input_audio", "input_audio": {"data": "https://..."}}` |
+| `file` | File | `{"type": "file", "file": {"file_data": "https://..."}}` |
 
-**注意事项**：
+**Catatan**：
 
-- `image_url/input_audio/file` 仅支持 URL 或 Data URI（`data:<mime>;base64,...`），裸 base64 会报错。
-- `reasoning_effort`：`none` 表示不输出思考，其他值都会输出思考内容。
-- 工具调用为**提示词模拟 + 客户端执行回填**：模型通过 `<tool_call>{...}</tool_call>` 输出调用请求，服务端解析为 `tool_calls`；不执行工具。
-- `grok-imagine-1.0-fast` 与瀑布流 imagine 生成链路一致，可直接通过 `/v1/chat/completions` 调用；其 `n/size/response_format` 由服务端 `[imagine_fast]` 统一控制。
-- `grok-imagine-1.0-fast` 在 `/v1/chat/completions` 的流式输出仅返回最终成图，不返回中间预览图。
-- `grok-imagine-1.0-fast` 流式 URL 出图会保持原始图片名（不追加 `-final` 后缀）。
-- 当图片疑似被审查拦截导致无最终图时，若开启 `image.blocked_parallel_enabled`，服务端会按 `image.blocked_parallel_attempts` 自动并行补偿生成，并优先使用不同 token；若仍无满足 `image.final_min_bytes` 的最终图则返回失败。
-- `grok-imagine-1.0-edit` 必须提供图片，多图默认取**最后 3 张**与最后一个文本。
-- `grok-imagine-1.0-video` 支持文生视频与多图参考视频：可通过多个 `image_url` 传最多 `7` 张参考图，并在文本中使用 `@图1`、`@图2` 这类占位符；服务端会自动替换为对应 `assetId`。
-- `@图N` 与 `image_url` 的顺序一一对应；若引用了不存在的图片序号，会直接报错。
-- 除上述外的其他参数将自动丢弃并忽略。
+- `image_url/input_audio/file` hanya mendukung URL atau Data URI (`data:<mime>;base64,...`), base64 mentah akan menyebabkan error.
+- `reasoning_effort`: `none` berarti tidak mengeluarkan thinking, sedangkan nilai lain akan mengeluarkan konten thinking.
+- Pemanggilan tool menggunakan **simulasi prompt + client-side execution dan pengisian balik**: model mengeluarkan permintaan panggilan melalui `<tool_call>{...}</tool_call>`, lalu service mem-parsing-nya menjadi `tool_calls`; tool tidak dieksekusi oleh service.
+- `grok-imagine-1.0-fast` menggunakan alur generasi imagine waterfall yang sama, sehingga bisa langsung dipanggil lewat `/v1/chat/completions`; parameter `n/size/response_format` dikendalikan secara terpusat oleh service melalui `[imagine_fast]`.
+- Output streaming `grok-imagine-1.0-fast` di `/v1/chat/completions` hanya mengembalikan gambar final, tanpa preview di tengah proses.
+- URL gambar hasil streaming `grok-imagine-1.0-fast` akan mempertahankan nama file asli (tanpa menambahkan suffix `-final`).
+- Jika gambar diduga terblokir moderasi sehingga tidak ada gambar final, dan `image.blocked_parallel_enabled` aktif, service akan otomatis menjalankan generasi kompensasi paralel sesuai `image.blocked_parallel_attempts`, serta memprioritaskan token yang berbeda; jika tetap tidak ada gambar final yang memenuhi `image.final_min_bytes`, respons akan gagal.
+- `grok-imagine-1.0-edit` wajib menyertakan gambar; untuk multi-gambar, secara default akan diambil **3 gambar terakhir** dan teks terakhir.
+- `grok-imagine-1.0-video` mendukung text-to-video dan video referensi multi-gambar: bisa mengirim hingga `7` gambar referensi melalui beberapa `image_url`, lalu menggunakan placeholder seperti `@图1`, `@图2` dalam teks; service akan otomatis menggantinya dengan `assetId` yang sesuai.
+- `@图N` berkorespondensi satu per satu dengan urutan `image_url`; jika mereferensikan nomor gambar yang tidak ada, akan langsung error.
+- Parameter lain di luar yang disebutkan di atas akan otomatis dibuang dan diabaikan.
 
 <br>
 
@@ -224,7 +224,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 ### `POST /v1/responses`
 
-> OpenAI Responses API 兼容接口
+> Endpoint kompatibel dengan OpenAI Responses API
 
 ```bash
 curl http://localhost:8000/v1/responses \
@@ -238,28 +238,28 @@ curl http://localhost:8000/v1/responses \
 ```
 
 <details>
-<summary>支持的请求参数</summary>
+<summary>Parameter request yang didukung</summary>
 
 <br>
 
-| 字段 | 类型 | 说明 |
+| Field | Tipe | Keterangan |
 | :-- | :-- | :-- |
-| `model` | string | 模型名称 |
-| `input` | string/array | 输入内容，支持字符串、消息数组或多模态内容块 |
-| `instructions` | string | 系统指令 |
-| `stream` | boolean | 是否流式输出 |
-| `temperature` | number | 采样温度 |
-| `top_p` | number | nucleus 采样 |
-| `tools` | array | 工具定义（支持 function 工具；内置工具类型见下方说明） |
-| `tool_choice` | string/object | 工具选择（auto/required/none 或指定工具） |
-| `parallel_tool_calls` | boolean | 是否允许并行工具调用 |
-| `reasoning` | object | 推理参数 |
-| └─`effort` | string | 推理强度 | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` |
+| `model` | string | Nama model |
+| `input` | string/array | Konten input, mendukung string, array pesan, atau blok konten multimodal |
+| `instructions` | string | Instruksi sistem |
+| `stream` | boolean | Apakah menggunakan output streaming |
+| `temperature` | number | Temperatur sampling |
+| `top_p` | number | Nucleus sampling |
+| `tools` | array | Definisi tool (mendukung function tool; tipe tool bawaan dijelaskan di bawah) |
+| `tool_choice` | string/object | Pemilihan tool (auto/required/none atau tool tertentu) |
+| `parallel_tool_calls` | boolean | Apakah mengizinkan pemanggilan tool paralel |
+| `reasoning` | object | Parameter reasoning |
+| └─`effort` | string | Tingkat reasoning | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` |
 
-**注意事项**：
+**Catatan**：
 
-- 内置工具 `web_search` / `file_search` / `code_interpreter` 目前会映射为 function tool **触发调用**，但**不执行托管工具**，需客户端自行执行并回填。
-- 流式输出会包含 `response.output_text.*` 与 `response.function_call_arguments.*` 事件。
+- Tool bawaan `web_search` / `file_search` / `code_interpreter` saat ini akan dipetakan menjadi function tool untuk **memicu pemanggilan**, tetapi **tidak mengeksekusi hosted tool**, sehingga client perlu menjalankan dan mengisi balik hasilnya sendiri.
+- Output streaming akan mencakup event `response.output_text.*` dan `response.function_call_arguments.*`.
 
 <br>
 
@@ -269,7 +269,7 @@ curl http://localhost:8000/v1/responses \
 
 ### `POST /v1/images/generations`
 
-> 图像生成接口
+> Endpoint image generation
 
 ```bash
 curl http://localhost:8000/v1/images/generations \
@@ -283,25 +283,25 @@ curl http://localhost:8000/v1/images/generations \
 ```
 
 <details>
-<summary>支持的请求参数</summary>
+<summary>Parameter request yang didukung</summary>
 
 <br>
 
-| 字段 | 类型 | 说明 | 可用参数 |
+| Field | Tipe | Keterangan | Parameter yang tersedia |
 | :-- | :-- | :-- | :-- |
-| `model` | string | 图像模型名 | `grok-imagine-1.0` |
-| `prompt` | string | 图像描述提示词 | - |
-| `n` | integer | 生成数量 | `1` - `10` (流式模式仅限 `1` 或 `2`) |
-| `stream` | boolean | 是否开启流式输出 | `true`, `false` |
-| `size` | string | 图片尺寸 | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
-| `quality` | string | 图片质量 | - (暂不支持) |
-| `response_format` | string | 响应格式 | `url`, `b64_json`, `base64` |
-| `style` | string | 风格 | - (暂不支持) |
+| `model` | string | Nama model gambar | `grok-imagine-1.0` |
+| `prompt` | string | Prompt deskripsi gambar | - |
+| `n` | integer | Jumlah generasi | `1` - `10` (mode streaming hanya mendukung `1` atau `2`) |
+| `stream` | boolean | Apakah mengaktifkan output streaming | `true`, `false` |
+| `size` | string | Ukuran gambar | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
+| `quality` | string | Kualitas gambar | - (belum didukung) |
+| `response_format` | string | Format respons | `url`, `b64_json`, `base64` |
+| `style` | string | Gaya | - (belum didukung) |
 
-**注意事项**：
+**Catatan**：
 
-- `quality`、`style` 参数为 OpenAI 兼容保留，当前版本暂不支持自定义。
-- 多图编辑若传入超过 3 张，仅取**最后 3 张**作为参考。
+- Parameter `quality` dan `style` disediakan untuk kompatibilitas OpenAI, tetapi saat ini belum mendukung kustomisasi.
+- Jika edit multi-gambar menerima lebih dari 3 gambar, hanya **3 gambar terakhir** yang akan dipakai sebagai referensi.
 
 <br>
 
@@ -311,7 +311,7 @@ curl http://localhost:8000/v1/images/generations \
 
 ### `POST /v1/images/edits`
 
-> 图像编辑接口（multipart/form-data）
+> Endpoint image editing (`multipart/form-data`)
 
 ```bash
 curl http://localhost:8000/v1/images/edits \
@@ -323,25 +323,25 @@ curl http://localhost:8000/v1/images/edits \
 ```
 
 <details>
-<summary>支持的请求参数</summary>
+<summary>Parameter request yang didukung</summary>
 
 <br>
 
-| 字段 | 类型 | 说明 | 可用参数 |
+| Field | Tipe | Keterangan | Parameter yang tersedia |
 | :-- | :-- | :-- | :-- |
-| `model` | string | 图像模型名 | `grok-imagine-1.0-edit` |
-| `prompt` | string | 编辑描述 | - |
-| `image` | file | 待编辑图片 | `png`, `jpg`, `webp` |
-| `n` | integer | 生成数量 | `1` - `10` (流式模式仅限 `1` 或 `2`) |
-| `stream` | boolean | 是否开启流式输出 | `true`, `false` |
-| `size` | string | 图片尺寸 | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
-| `quality` | string | 图片质量 | - (暂不支持) |
-| `response_format` | string | 响应格式 | `url`, `b64_json`, `base64` |
-| `style` | string | 风格 | - (暂不支持) |
+| `model` | string | Nama model gambar | `grok-imagine-1.0-edit` |
+| `prompt` | string | Deskripsi edit | - |
+| `image` | file | Gambar yang akan diedit | `png`, `jpg`, `webp` |
+| `n` | integer | Jumlah generasi | `1` - `10` (mode streaming hanya mendukung `1` atau `2`) |
+| `stream` | boolean | Apakah mengaktifkan output streaming | `true`, `false` |
+| `size` | string | Ukuran gambar | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
+| `quality` | string | Kualitas gambar | - (belum didukung) |
+| `response_format` | string | Format respons | `url`, `b64_json`, `base64` |
+| `style` | string | Gaya | - (belum didukung) |
 
-**注意事项**：
+**Catatan**：
 
-- `quality`、`style` 参数为 OpenAI 兼容保留，当前版本暂不支持自定义。
+- Parameter `quality` dan `style` disediakan untuk kompatibilitas OpenAI, tetapi saat ini belum mendukung kustomisasi.
 
 <br>
 
@@ -351,7 +351,7 @@ curl http://localhost:8000/v1/images/edits \
 
 ### `POST /v1/videos`
 
-> 视频生成接口（OpenAI videos.create 兼容）
+> Endpoint video generation (kompatibel dengan OpenAI videos.create)
 
 ```bash
 curl http://localhost:8000/v1/videos \
@@ -367,26 +367,26 @@ curl http://localhost:8000/v1/videos \
 ```
 
 <details>
-<summary>支持的请求参数</summary>
+<summary>Parameter request yang didukung</summary>
 
 <br>
 
-| 字段 | 类型 | 说明 | 可用参数 |
+| Field | Tipe | Keterangan | Parameter yang tersedia |
 | :-- | :-- | :-- | :-- |
-| `model` | string | 视频模型名 | `grok-imagine-1.0-video` |
-| `prompt` | string | 视频提示词 | - |
-| `size` | string | 画面比例（会映射到 aspect_ratio） | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
-| `seconds` | integer | 目标时长（秒） | `6` ~ `30` |
-| `quality` | string | 视频质量（映射到 resolution） | `standard`, `high` |
-| `image_reference` | array | 参考图（可选） | 兼容 OpenAI content block 数组格式 (`[{"type":"image_url"...}]`) 或纯 URL 字符串数组；单图也请传单元素数组 |
-| `input_reference` | file | multipart 参考图（可选） | `png`, `jpg`, `webp` |
+| `model` | string | Nama model video | `grok-imagine-1.0-video` |
+| `prompt` | string | Prompt video | - |
+| `size` | string | Rasio frame (akan dipetakan ke aspect_ratio) | `1280x720`, `720x1280`, `1792x1024`, `1024x1792`, `1024x1024` |
+| `seconds` | integer | Durasi target (detik) | `6` ~ `30` |
+| `quality` | string | Kualitas video (dipetakan ke resolution) | `standard`, `high` |
+| `image_reference` | array | Gambar referensi (opsional) | Kompatibel dengan format array content block OpenAI (`[{"type":"image_url"...}]`) atau array string URL biasa; untuk satu gambar tetap gunakan array satu elemen |
+| `input_reference` | file | Gambar referensi multipart (opsional) | `png`, `jpg`, `webp` |
 
-**注意事项**：
+**Catatan**：
 
-- 服务端已支持 6~30 秒自动链式扩展，**无需使用 `/v1/video/extend`**。
-- `quality=standard` 对应 `480p`；`quality=high` 对应 `720p`。
-- 基础号池请求 `720p` 时会先产出 `480p` 再按 `video.upscale_timing` 执行超分。
-- `image_reference` 统一使用数组格式，最多可传 7 张参考图；单图场景也请传单元素数组。`input_reference` 主要以表单上传参考图；若两者同时传入，会按顺序作为参考图合并输入；可在提示词中使用 `@图1`、`@图2`。
+- Service sudah mendukung ekspansi berantai otomatis untuk durasi 6~30 detik, **tanpa perlu menggunakan `/v1/video/extend`**.
+- `quality=standard` sesuai dengan `480p`; `quality=high` sesuai dengan `720p`.
+- Jika pool akun Basic meminta `720p`, hasilnya akan dibuat sebagai `480p` terlebih dahulu lalu di-upscale sesuai `video.upscale_timing`.
+- `image_reference` wajib menggunakan format array, dengan maksimum 7 gambar referensi; untuk satu gambar pun tetap gunakan array satu elemen. `input_reference` terutama untuk upload gambar referensi melalui form; jika keduanya dikirim bersamaan, keduanya akan digabung sebagai input referensi sesuai urutan; placeholder seperti `@图1`, `@图2` bisa digunakan di prompt.
 
 <br>
 
@@ -394,97 +394,97 @@ curl http://localhost:8000/v1/videos \
 
 <br>
 
-## 参数配置
+## Konfigurasi Parameter
 
-配置文件：`data/config.toml`
+File konfigurasi: `data/config.toml`
 
 > [!NOTE]
-> 生产环境或反向代理部署时，请确保 `app.app_url` 配置为对外可访问的完整 URL，
-> 否则可能出现文件访问链接不正确或 403 等问题。
+> Saat deployment production atau di balik reverse proxy, pastikan `app.app_url` dikonfigurasi sebagai URL lengkap yang dapat diakses dari luar,
+> jika tidak, link akses file bisa salah atau memunculkan masalah seperti 403.
 
 > [!TIP]
-> **v2.0 配置结构升级**：旧版本用户更新后，配置会**自动迁移**到新结构，无需手动修改。
-> 旧的 `[grok]` 配置节中的自定义值会自动映射到对应的新配置节。
+> **Upgrade struktur konfigurasi v2.0**: setelah update, pengguna versi lama akan **dimigrasikan otomatis** ke struktur baru tanpa perlu mengubah konfigurasi secara manual.
+> Nilai kustom pada section `[grok]` lama akan otomatis dipetakan ke section konfigurasi baru yang sesuai.
 
-| 模块 | 字段 | 配置名 | 说明 | 默认值 |
+| Modul | Field | Nama konfigurasi | Keterangan | Nilai default |
 | :-- | :-- | :-- | :-- | :-- |
-| **app** | `app_url` | 应用地址 | 当前 Grok2API 服务的外部访问 URL，用于文件链接访问。 | `""` |
-|  | `app_key` | 后台密码 | 登录 Grok2API 管理后台的密码（必填）。 | `grok2api` |
-|  | `api_key` | API 密钥 | 调用 Grok2API 服务的 Token（可选，支持逗号分隔或数组）。 | `""` |
-|  | `function_enabled` | Function 开关 | 是否启用 function 功能玩法。 | `false` |
-|  | `function_key` | Function 密钥 | Function 调用密钥（可选）。 | `""` |
-|  | `image_format` | 图片格式 | 生成的图片格式（url 或 base64）。 | `url` |
-|  | `video_format` | 视频格式 | 生成的视频格式（html 或 url，url 为处理后的链接）。 | `html` |
-|  | `temporary` | 临时对话 | 是否启用临时对话模式。 | `true` |
-|  | `disable_memory` | 禁用记忆 | 禁用 Grok 记忆功能，防止响应中出现不相关上下文。 | `true` |
-|  | `stream` | 流式响应 | 是否默认启用流式输出。 | `true` |
-|  | `thinking` | 思维链 | 是否默认启用思维链输出。 | `true` |
-|  | `dynamic_statsig` | 动态指纹 | 是否动态生成 Statsig 指纹。 | `true` |
-|  | `custom_instruction` | 自定义指令 | 多行文本，透传为 Grok `customPersonality`。 | `""` |
-|  | `filter_tags` | 过滤标签 | 自动过滤 Grok 响应中的特殊标签。 | `["xaiartifact","xai:tool_usage_card","grok:render"]` |
-| **proxy** | `base_proxy_url` | 基础代理 URL | 代理请求到 Grok 官网的基础服务地址。 | `""` |
-|  | `asset_proxy_url` | 资源代理 URL | 代理请求到 Grok 官网的静态资源（图片/视频）地址。 | `""` |
-|  | `cf_cookies` | CF Cookies | FlareSolverr 刷新写入的完整 Cookie 字符串。 | `""` |
-|  | `skip_proxy_ssl_verify` | 跳过代理 SSL 校验 | 代理使用自签名证书时启用（仅放行代理证书，目标站点仍校验）。 | `false` |
-|  | `enabled` | CF 自动刷新 | 是否启用 CF 自动刷新。 | `false` |
-|  | `flaresolverr_url` | FlareSolverr 地址 | FlareSolverr 服务的 HTTP 地址。 | `""` |
-|  | `refresh_interval` | 刷新间隔 | 自动刷新 cf_clearance 间隔（秒）。 | `3600` |
-|  | `timeout` | 挑战超时 | CF 挑战等待超时（秒）。 | `60` |
-|  | `cf_clearance` | CF Clearance | Cloudflare 验证 Cookie。 | `""` |
-|  | `browser` | 浏览器指纹 | curl_cffi 浏览器指纹标识（如 chrome136）。 | `chrome136` |
-|  | `user_agent` | User-Agent | HTTP 请求的 User-Agent 字符串。 | `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36` |
-| **retry** | `max_retry` | 最大重试 | 请求 Grok 服务失败时的最大重试次数。 | `3` |
-|  | `retry_status_codes` | 重试状态码 | 触发重试的 HTTP 状态码列表。 | `[401, 429, 403]` |
-|  | `reset_session_status_codes` | 重建状态码 | 触发重建 session 的 HTTP 状态码列表（用于轮换代理）。 | `[403]` |
-|  | `retry_backoff_base` | 退避基数 | 重试退避的基础延迟（秒）。 | `0.5` |
-|  | `retry_backoff_factor` | 退避倍率 | 重试退避的指数放大系数。 | `2.0` |
-|  | `retry_backoff_max` | 退避上限 | 单次重试等待的最大延迟（秒）。 | `20.0` |
-|  | `retry_budget` | 退避预算 | 单次请求的最大重试总耗时（秒）。 | `60.0` |
-| **token** | `auto_refresh` | 自动刷新 | 是否开启 Token 自动刷新机制。 | `true` |
-|  | `refresh_interval_hours` | 刷新间隔 | 普通 Token 刷新的时间间隔（小时）。 | `8` |
-|  | `super_refresh_interval_hours` | Super 刷新间隔 | Super Token 刷新的时间间隔（小时）。 | `2` |
-|  | `fail_threshold` | 失败阈值 | 单个 Token 连续失败多少次后被标记为不可用。 | `5` |
-|  | `save_delay_ms` | 保存延迟 | Token 变更合并写入的延迟（毫秒）。 | `500` |
-|  | `usage_flush_interval_sec` | 用量落库间隔 | 用量类字段写入数据库的最小间隔（秒）。 | `5` |
-|  | `reload_interval_sec` | 同步间隔 | 多 worker 场景下 Token 状态刷新间隔（秒）。 | `30` |
-| **cache** | `enable_auto_clean` | 自动清理 | 是否启用缓存自动清理，开启后按上限自动回收。 | `true` |
-|  | `limit_mb` | 清理阈值 | 缓存大小阈值（MB），超过阈值会触发清理。 | `512` |
-| **chat** | `concurrent` | 并发上限 | Reverse 接口并发上限。 | `50` |
-|  | `timeout` | 请求超时 | Reverse 接口超时时间（秒）。 | `60` |
-|  | `stream_timeout` | 流空闲超时 | 流式空闲超时时间（秒）。 | `60` |
-| **image** | `timeout` | 请求超时 | WebSocket 请求超时时间（秒）。 | `60` |
-|  | `stream_timeout` | 流空闲超时 | WebSocket 流式空闲超时时间（秒）。 | `60` |
-|  | `final_timeout` | 最终图超时 | 收到中等图后等待最终图的超时秒数。 | `15` |
-|  | `blocked_grace_seconds` | 审查宽限秒数 | 收到中等图后，判定疑似被审查的宽限秒数。 | `10` |
-|  | `nsfw` | NSFW 模式 | WebSocket 请求是否启用 NSFW。 | `true` |
-|  | `medium_min_bytes` | 中等图最小字节 | 判定中等质量图的最小字节数。 | `30000` |
-|  | `final_min_bytes` | 最终图最小字节 | 判定最终图的最小字节数（通常 JPG > 100KB）。 | `100000` |
-|  | `blocked_parallel_attempts` | 并行补偿次数 | 遇到疑似审查/拦截时的并行补偿生成次数。 | `5` |
-|  | `blocked_parallel_enabled` | 并行补偿开关 | 是否启用并行补偿（启用时优先使用不同 token）。 | `true` |
-| **imagine_fast** | `n` | 生成数量 | 仅对 grok-imagine-1.0-fast 生效。 | `1` |
-|  | `size` | 图片尺寸 | `1280x720` / `720x1280` / `1792x1024` / `1024x1792` / `1024x1024` | `1024x1024` |
-|  | `response_format` | 响应格式 | `url` / `b64_json` / `base64` | `url` |
-| **video** | `concurrent` | 并发上限 | Reverse 接口并发上限。 | `100` |
-|  | `timeout` | 请求超时 | Reverse 接口超时时间（秒）。 | `60` |
-|  | `stream_timeout` | 流空闲超时 | 流式空闲超时时间（秒）。 | `60` |
-|  | `upscale_timing` | 超分时机 | Basic 号池 720p 超分模式：`single`（每轮扩展后超分）/ `complete`（所有扩展后超分）。 | `complete` |
-| **voice** | `timeout` | 请求超时 | Voice 请求超时时间（秒）。 | `60` |
-| **asset** | `upload_concurrent` | 上传并发 | 上传接口的最大并发数。 | `100` |
-|  | `upload_timeout` | 上传超时 | 上传接口超时时间（秒）。 | `60` |
-|  | `download_concurrent` | 下载并发 | 下载接口的最大并发数。 | `100` |
-|  | `download_timeout` | 下载超时 | 下载接口超时时间（秒）。 | `60` |
-|  | `list_concurrent` | 查询并发 | 资产查询接口的最大并发数。 | `100` |
-|  | `list_timeout` | 查询超时 | 资产查询接口超时时间（秒）。 | `60` |
-|  | `list_batch_size` | 查询批次大小 | 单次查询可处理的 Token 数量。 | `50` |
-|  | `delete_concurrent` | 删除并发 | 资产删除接口的最大并发数。 | `100` |
-|  | `delete_timeout` | 删除超时 | 资产删除接口超时时间（秒）。 | `60` |
-|  | `delete_batch_size` | 删除批次大小 | 单次删除可处理的 Token 数量。 | `50` |
-| **nsfw** | `concurrent` | 并发上限 | 批量开启 NSFW 模式时的并发请求上限。 | `60` |
-|  | `batch_size` | 批次大小 | 批量开启 NSFW 模式的单批处理数量。 | `30` |
-|  | `timeout` | 请求超时 | NSFW 开启相关请求的超时时间（秒）。 | `60` |
-| **usage** | `concurrent` | 并发上限 | 批量刷新用量时的并发请求上限。 | `100` |
-|  | `batch_size` | 批次大小 | 批量刷新用量的单批处理数量。 | `50` |
-|  | `timeout` | 请求超时 | 用量查询接口的超时时间（秒）。 | `60` |
+| **app** | `app_url` | Alamat aplikasi | URL akses eksternal layanan Grok2API saat ini, digunakan untuk akses link file. | `""` |
+|  | `app_key` | Password admin | Password untuk login ke panel admin Grok2API (wajib diisi). | `grok2api` |
+|  | `api_key` | API key | Token untuk memanggil layanan Grok2API (opsional, mendukung pemisah koma atau array). | `""` |
+|  | `function_enabled` | Sakelar Function | Apakah fitur function diaktifkan. | `false` |
+|  | `function_key` | Function key | Kunci pemanggilan Function (opsional). | `""` |
+|  | `image_format` | Format gambar | Format gambar yang dihasilkan (url atau base64). | `url` |
+|  | `video_format` | Format video | Format video yang dihasilkan (html atau url, url adalah link hasil pemrosesan). | `html` |
+|  | `temporary` | Percakapan sementara | Apakah mode percakapan sementara diaktifkan. | `true` |
+|  | `disable_memory` | Nonaktifkan memory | Menonaktifkan fitur memory Grok agar respons tidak menyertakan konteks yang tidak relevan. | `true` |
+|  | `stream` | Respons streaming | Apakah output streaming diaktifkan secara default. | `true` |
+|  | `thinking` | Chain of thought | Apakah output chain-of-thought diaktifkan secara default. | `true` |
+|  | `dynamic_statsig` | Fingerprint dinamis | Apakah fingerprint Statsig dihasilkan secara dinamis. | `true` |
+|  | `custom_instruction` | Instruksi kustom | Teks multi-baris yang diteruskan sebagai `customPersonality` ke Grok. | `""` |
+|  | `filter_tags` | Filter tag | Secara otomatis memfilter tag khusus dalam respons Grok. | `["xaiartifact","xai:tool_usage_card","grok:render"]` |
+| **proxy** | `base_proxy_url` | URL proxy dasar | Alamat service dasar untuk mem-proxy request ke situs resmi Grok. | `""` |
+|  | `asset_proxy_url` | URL proxy aset | Alamat untuk mem-proxy aset statis (gambar/video) dari situs resmi Grok. | `""` |
+|  | `cf_cookies` | CF Cookies | String Cookie lengkap yang ditulis saat refresh FlareSolverr. | `""` |
+|  | `skip_proxy_ssl_verify` | Lewati verifikasi SSL proxy | Aktifkan saat proxy memakai sertifikat self-signed (hanya melewati sertifikat proxy, situs tujuan tetap diverifikasi). | `false` |
+|  | `enabled` | Refresh CF otomatis | Apakah refresh CF otomatis diaktifkan. | `false` |
+|  | `flaresolverr_url` | Alamat FlareSolverr | Alamat HTTP service FlareSolverr. | `""` |
+|  | `refresh_interval` | Interval refresh | Interval refresh otomatis `cf_clearance` (detik). | `3600` |
+|  | `timeout` | Timeout challenge | Timeout menunggu challenge CF (detik). | `60` |
+|  | `cf_clearance` | CF Clearance | Cookie verifikasi Cloudflare. | `""` |
+|  | `browser` | Fingerprint browser | Identifier fingerprint browser `curl_cffi` (misalnya `chrome136`). | `chrome136` |
+|  | `user_agent` | User-Agent | String User-Agent untuk request HTTP. | `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36` |
+| **retry** | `max_retry` | Maksimum retry | Jumlah maksimum retry saat request ke service Grok gagal. | `3` |
+|  | `retry_status_codes` | Kode status retry | Daftar kode status HTTP yang memicu retry. | `[401, 429, 403]` |
+|  | `reset_session_status_codes` | Kode status reset | Daftar kode status HTTP yang memicu pembuatan ulang session (untuk rotasi proxy). | `[403]` |
+|  | `retry_backoff_base` | Basis backoff | Delay dasar untuk backoff retry (detik). | `0.5` |
+|  | `retry_backoff_factor` | Faktor backoff | Koefisien eksponensial pengali backoff retry. | `2.0` |
+|  | `retry_backoff_max` | Batas atas backoff | Delay maksimum untuk satu kali retry (detik). | `20.0` |
+|  | `retry_budget` | Budget backoff | Total waktu maksimum retry untuk satu request (detik). | `60.0` |
+| **token** | `auto_refresh` | Refresh otomatis | Apakah mekanisme refresh Token otomatis diaktifkan. | `true` |
+|  | `refresh_interval_hours` | Interval refresh | Interval waktu refresh Token biasa (jam). | `8` |
+|  | `super_refresh_interval_hours` | Interval refresh Super | Interval waktu refresh Token Super (jam). | `2` |
+|  | `fail_threshold` | Ambang kegagalan | Berapa kali Token gagal berturut-turut sebelum ditandai tidak tersedia. | `5` |
+|  | `save_delay_ms` | Delay penyimpanan | Delay write gabungan saat Token berubah (milidetik). | `500` |
+|  | `usage_flush_interval_sec` | Interval flush penggunaan | Interval minimum untuk menulis field penggunaan ke database (detik). | `5` |
+|  | `reload_interval_sec` | Interval sinkronisasi | Interval refresh status Token pada skenario multi-worker (detik). | `30` |
+| **cache** | `enable_auto_clean` | Pembersihan otomatis | Apakah pembersihan cache otomatis diaktifkan; jika aktif, cache akan direklamasi saat melebihi batas. | `true` |
+|  | `limit_mb` | Ambang pembersihan | Ambang ukuran cache (MB); jika terlampaui akan memicu pembersihan. | `512` |
+| **chat** | `concurrent` | Batas paralel | Batas paralel endpoint Reverse. | `50` |
+|  | `timeout` | Timeout request | Timeout endpoint Reverse (detik). | `60` |
+|  | `stream_timeout` | Timeout idle stream | Timeout idle stream (detik). | `60` |
+| **image** | `timeout` | Timeout request | Timeout request WebSocket (detik). | `60` |
+|  | `stream_timeout` | Timeout idle stream | Timeout idle stream WebSocket (detik). | `60` |
+|  | `final_timeout` | Timeout gambar final | Waktu tunggu maksimum setelah menerima gambar kualitas menengah untuk gambar final (detik). | `15` |
+|  | `blocked_grace_seconds` | Grace period moderasi | Masa tenggang untuk menilai gambar kemungkinan terblokir moderasi setelah menerima gambar menengah (detik). | `10` |
+|  | `nsfw` | Mode NSFW | Apakah request WebSocket mengaktifkan NSFW. | `true` |
+|  | `medium_min_bytes` | Byte minimum gambar menengah | Ukuran byte minimum untuk mengidentifikasi gambar kualitas menengah. | `30000` |
+|  | `final_min_bytes` | Byte minimum gambar final | Ukuran byte minimum untuk mengidentifikasi gambar final (biasanya JPG > 100KB). | `100000` |
+|  | `blocked_parallel_attempts` | Jumlah kompensasi paralel | Berapa kali generasi kompensasi paralel dilakukan saat diduga terkena moderasi/pemblokiran. | `5` |
+|  | `blocked_parallel_enabled` | Sakelar kompensasi paralel | Apakah kompensasi paralel diaktifkan (jika aktif, akan memprioritaskan token yang berbeda). | `true` |
+| **imagine_fast** | `n` | Jumlah generasi | Hanya berlaku untuk `grok-imagine-1.0-fast`. | `1` |
+|  | `size` | Ukuran gambar | `1280x720` / `720x1280` / `1792x1024` / `1024x1792` / `1024x1024` | `1024x1024` |
+|  | `response_format` | Format respons | `url` / `b64_json` / `base64` | `url` |
+| **video** | `concurrent` | Batas paralel | Batas paralel endpoint Reverse. | `100` |
+|  | `timeout` | Timeout request | Timeout endpoint Reverse (detik). | `60` |
+|  | `stream_timeout` | Timeout idle stream | Timeout idle stream (detik). | `60` |
+|  | `upscale_timing` | Waktu upscale | Mode upscale 720p untuk pool akun Basic: `single` (upscale setelah tiap ekspansi) / `complete` (upscale setelah semua ekspansi selesai). | `complete` |
+| **voice** | `timeout` | Timeout request | Timeout request Voice (detik). | `60` |
+| **asset** | `upload_concurrent` | Paralel upload | Jumlah paralel maksimum untuk endpoint upload. | `100` |
+|  | `upload_timeout` | Timeout upload | Timeout endpoint upload (detik). | `60` |
+|  | `download_concurrent` | Paralel download | Jumlah paralel maksimum untuk endpoint download. | `100` |
+|  | `download_timeout` | Timeout download | Timeout endpoint download (detik). | `60` |
+|  | `list_concurrent` | Paralel query | Jumlah paralel maksimum untuk endpoint query aset. | `100` |
+|  | `list_timeout` | Timeout query | Timeout endpoint query aset (detik). | `60` |
+|  | `list_batch_size` | Ukuran batch query | Jumlah Token yang dapat diproses dalam satu kali query. | `50` |
+|  | `delete_concurrent` | Paralel hapus | Jumlah paralel maksimum untuk endpoint hapus aset. | `100` |
+|  | `delete_timeout` | Timeout hapus | Timeout endpoint hapus aset (detik). | `60` |
+|  | `delete_batch_size` | Ukuran batch hapus | Jumlah Token yang dapat dihapus dalam satu kali proses. | `50` |
+| **nsfw** | `concurrent` | Batas paralel | Batas request paralel saat mengaktifkan mode NSFW secara massal. | `60` |
+|  | `batch_size` | Ukuran batch | Jumlah item per batch saat mengaktifkan mode NSFW secara massal. | `30` |
+|  | `timeout` | Timeout request | Timeout request terkait aktivasi NSFW (detik). | `60` |
+| **usage** | `concurrent` | Batas paralel | Batas request paralel saat me-refresh usage secara massal. | `100` |
+|  | `batch_size` | Ukuran batch | Jumlah item per batch saat me-refresh usage secara massal. | `50` |
+|  | `timeout` | Timeout request | Timeout endpoint query usage (detik). | `60` |
 
 <br>
 
