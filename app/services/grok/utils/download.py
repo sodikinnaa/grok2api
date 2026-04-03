@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
+
+_ASSETS_HOST = "assets.grok.com"
+
 import aiofiles
 
 from app.core.logger import logger
@@ -25,6 +28,11 @@ from app.services.grok.utils.locks import _get_download_semaphore, _file_lock
 
 class DownloadService:
     """Assets download service."""
+
+    @staticmethod
+    def _is_assets_host(parsed) -> bool:
+        hostname = (getattr(parsed, "hostname", "") or "").strip().lower()
+        return hostname == _ASSETS_HOST
 
     def __init__(self):
         self._session: Optional[ResettableSession] = None
@@ -78,7 +86,7 @@ class DownloadService:
 
         app_url = get_config("app.app_url")
         if app_url:
-            if parsed and parsed.netloc and parsed.netloc != "assets.grok.com":
+            if parsed and parsed.netloc and not self._is_assets_host(parsed):
                 return asset_url
             await self.download_file(asset_url, token, media_type)
             return f"{app_url.rstrip('/')}/v1/files/{media_type}{path}"
@@ -114,7 +122,7 @@ class DownloadService:
         try:
             parsed_video = urlparse(video_url)
             should_mirror_video = (
-                (parsed_video.scheme in ("http", "https") and parsed_video.netloc == "assets.grok.com")
+                (parsed_video.scheme in ("http", "https") and self._is_assets_host(parsed_video))
                 or (not parsed_video.scheme and not parsed_video.netloc)
             )
             if should_mirror_video:
