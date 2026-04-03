@@ -71,6 +71,9 @@ class DownloadService:
     async def resolve_url(
         self, path_or_url: str, token: str, media_type: str = "image"
     ) -> str:
+        if isinstance(path_or_url, str) and path_or_url.startswith("/v1/files/"):
+            return path_or_url
+
         asset_url = path_or_url
         path = path_or_url
         parsed = None
@@ -116,17 +119,25 @@ class DownloadService:
         final_video_url = video_url
         try:
             parsed_video = urlparse(video_url)
+            is_local_file_url = (
+                (not parsed_video.scheme and not parsed_video.netloc)
+                and str(video_url or "").startswith("/v1/files/video/")
+            )
             should_mirror_video = (
-                (parsed_video.scheme in ("http", "https") and self._is_assets_host(parsed_video))
-                or (not parsed_video.scheme and not parsed_video.netloc)
+                parsed_video.scheme in ("http", "https")
+                or (not parsed_video.scheme and not parsed_video.netloc and not is_local_file_url)
             )
             if should_mirror_video:
-                await self.download_file(video_url, token, "video")
+                logger.info(f"Video mirror start: source={parsed_video.path or video_url}")
+                cache_path, _ = await self.download_file(video_url, token, "video")
                 final_video_url = self._build_local_cache_url(video_url, "video")
+                logger.info(
+                    f"Video mirror success: source={parsed_video.path or video_url}, cache={cache_path}"
+                )
             else:
                 final_video_url = await self.resolve_url(video_url, token, "video")
         except Exception as e:
-            logger.warning(f"Video mirror failed, fallback to upstream URL: {e}")
+            logger.warning(f"Video mirror failed: source={video_url}, error={e}")
             final_video_url = await self.resolve_url(video_url, token, "video")
 
         final_thumb_url = ""

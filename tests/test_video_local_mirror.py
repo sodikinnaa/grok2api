@@ -1,7 +1,9 @@
 import asyncio
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app.services.grok.services.video import VideoRoundResult, VideoService
 from app.services.grok.utils.download import DownloadService
 from main import create_app
 
@@ -211,3 +213,119 @@ def test_videos_endpoint_falls_back_to_upstream_url_when_not_local(monkeypatch):
     assert response.status_code == 200
     payload = response.json()
     assert payload["url"] == upstream_url
+
+
+def test_download_service_resolve_video_output_mirrors_public_video_url(monkeypatch):
+    calls = []
+
+    async def fake_download_file(self, file_path: str, token: str, media_type: str = "image"):
+        calls.append((file_path, token, media_type))
+        return Path("/tmp/data/tmp/video/generated-test-video.mp4"), "video/mp4"
+
+    async def fake_resolve_url(self, path_or_url: str, token: str, media_type: str = "image"):
+        return path_or_url
+
+    monkeypatch.setattr(DownloadService, "download_file", fake_download_file)
+    monkeypatch.setattr(DownloadService, "resolve_url", fake_resolve_url)
+
+    async def _run():
+        service = DownloadService()
+        try:
+            video_url, thumb_url = await service.resolve_video_output(
+                "https://imagine-public.x.ai/share/generated/test-video.mp4?cache=1",
+                "secret-token",
+            )
+        finally:
+            await service.close()
+        assert video_url == "/v1/files/video/share-generated-test-video.mp4"
+        assert thumb_url == ""
+
+    asyncio.run(_run())
+    assert calls == [
+        (
+            "https://imagine-public.x.ai/share/generated/test-video.mp4?cache=1",
+            "secret-token",
+            "video",
+        )
+    ]
+
+
+def test_video_service_completions_non_stream_returns_local_video_url(monkeypatch):
+    class DummyTokenInfo:
+        token = "secret-token"
+
+    class DummyTokenManager:
+        async def reload_if_stale(self):
+            return None
+
+        def get_token_for_video(self, **kwargs):
+            return DummyTokenInfo()
+
+        def get_pool_name_for_token(self, token):
+            return "basic"
+
+        async def consume(self, token, effort):
+            return None
+
+    async def fake_create_post(self, token: str, prompt: str, media_type: str = "MEDIA_POST_TYPE_VIDEO", media_url: str = None):
+        return "seed-post-id"
+
+    async def fake_request_round_stream(**kwargs):
+        async def _empty():
+            if False:
+                yield b""
+        return _empty()
+
+    async def fake_collect_round_result(response, *, model: str, source: str):
+        return VideoRoundResult(
+            response_id="resp-123",
+            post_id="post-123",
+            video_url="https://imagine-public.x.ai/share/generated/test-video.mp4?cache=1",
+            thumbnail_url="",
+            saw_video_event=True,
+        )
+
+    async def fake_resolve_video_output(self, video_url: str, token: str, thumbnail_url: str = ""):
+        assert video_url == "https://imagine-public.x.ai/share/generated/test-video.mp4?cache=1"
+        return "/v1/files/video/share-generated-test-video.mp4", ""
+
+    async def fake_render_video(self, video_url: str, token: str, thumbnail_url: str = ""):
+        return f"[video]({video_url})"
+
+    async def fake_get_token_manager():
+        return DummyTokenManager()
+
+    monkeypatch.setattr("app.services.grok.services.video.get_token_manager", fake_get_token_manager)
+    monkeypatch.setattr("app.services.grok.services.video.ModelService.pool_candidates_for_model", lambda model: ["dummy-pool"])
+    monkeypatch.setattr("app.services.grok.services.video.ModelService.get", lambda model: None)
+    monkeypatch.setattr("app.services.grok.services.video.VideoService.create_post", fake_create_post)
+    monkeypatch.setattr("app.services.grok.services.video._request_round_stream", fake_request_round_stream)
+    monkeypatch.setattr("app.services.grok.services.video._collect_round_result", fake_collect_round_result)
+    monkeypatch.setattr(DownloadService, "resolve_video_output", fake_resolve_video_output)
+    monkeypatch.setattr(DownloadService, "render_video", fake_render_video)
+    monkeypatch.setattr(
+        "app.services.grok.services.video.get_config",
+        lambda key, default=None: {
+            "app.stream": False,
+            "app.thinking": False,
+            "retry.max_retry": 1,
+            "video.upscale_timing": "complete",
+            "video.enable_public_asset": False,
+        }.get(key, default),
+    )
+
+    result = asyncio.run(
+        VideoService.completions(
+            model="grok-imagine-1.0-video",
+            messages=[{"role": "user", "content": "seekor kucing sedang jogging"}],
+            stream=False,
+            aspect_ratio="3:2",
+            video_length=6,
+            resolution="480p",
+            preset="custom",
+        )
+    )
+
+    message = result["choices"][0]["message"]
+    assert message["video_url"] == "/v1/files/video/share-generated-test-video.mp4"
+    assert message["content"] == "[video](/v1/files/video/share-generated-test-video.mp4)"

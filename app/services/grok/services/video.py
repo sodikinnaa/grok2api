@@ -1228,10 +1228,15 @@ class VideoService:
 
                     dl_service = DownloadService()
                     try:
-                        content = await dl_service.render_video(
+                        final_video_url, final_thumbnail_url = await dl_service.resolve_video_output(
                             final_video_url,
                             token,
                             final_result.thumbnail_url,
+                        )
+                        content = await dl_service.render_video(
+                            final_video_url,
+                            token,
+                            final_thumbnail_url,
                         )
                     finally:
                         await dl_service.close()
@@ -1248,6 +1253,7 @@ class VideoService:
                                     "role": "assistant",
                                     "content": content,
                                     "refusal": None,
+                                    "video_url": final_video_url,
                                 },
                                 "finish_reason": "stop",
                             }
