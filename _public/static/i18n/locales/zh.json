@@ -247,6 +247,7 @@
     "statImageQuota": "Image 剩余",
     "statChatConsumed": "Chat 已消耗",
     "statImageConsumed": "Image 已消耗",
+    "statVideoConsumed": "Video 已消耗",
     "statVideoQuota": "Video 剩余",
     "statVideoUnavailable": "无法统计",
     "statTotalCalls": "总调用次数",

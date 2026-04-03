@@ -247,6 +247,7 @@
     "statImageQuota": "Image Remaining",
     "statChatConsumed": "Chat Consumed",
     "statImageConsumed": "Image Consumed",
+    "statVideoConsumed": "Video Consumed",
     "statVideoQuota": "Video Remaining",
     "statVideoUnavailable": "N/A",
     "statTotalCalls": "Total Calls",
