@@ -35,6 +35,9 @@ QUALITY_TO_RESOLUTION = {
     "standard": "480p",
     "high": "720p",
 }
+VALID_ASPECT_RATIOS = {"16:9", "9:16", "3:2", "2:3", "1:1"}
+VALID_RESOLUTION_NAMES = {"480p", "720p"}
+VALID_PRESETS = {"fun", "normal", "spicy", "custom"}
 
 
 class VideoCreateRequest(BaseModel):
@@ -47,6 +50,22 @@ class VideoCreateRequest(BaseModel):
     size: Optional[str] = Field("1792x1024", description="Output size")
     seconds: Optional[int] = Field(6, description="Video length in seconds")
     quality: Optional[str] = Field("standard", description="Quality: standard/high")
+    aspect_ratio: Optional[str] = Field(
+        None,
+        description="Backend-native aspect ratio override: one of 16:9, 9:16, 3:2, 2:3, 1:1",
+    )
+    video_length: Optional[int] = Field(
+        None,
+        description="Backend-native video length in seconds (6-30). Overrides seconds when provided.",
+    )
+    resolution_name: Optional[str] = Field(
+        None,
+        description="Backend-native resolution override: 480p or 720p",
+    )
+    preset: Optional[str] = Field(
+        "custom",
+        description="Backend-native preset: fun, normal, spicy, custom",
+    )
     image_reference: Optional[Any] = Field(
         None,
         description="Image references using chat/completions content-block array format: [{type:'image_url', image_url:{url:'...'}}] or an array of plain URL strings",
@@ -189,6 +208,61 @@ def _normalize_seconds(seconds: Optional[int]) -> int:
             message="seconds must be between 6 and 30",
             param="seconds",
             code="invalid_seconds",
+        )
+    return value
+
+
+def _normalize_aspect_ratio(aspect_ratio: Optional[str]) -> Optional[str]:
+    value = (aspect_ratio or "").strip()
+    if not value:
+        return None
+
+    if value in SIZE_TO_ASPECT:
+        return SIZE_TO_ASPECT[value]
+
+    if value not in VALID_ASPECT_RATIOS:
+        allowed = sorted(list(VALID_ASPECT_RATIOS) + list(SIZE_TO_ASPECT.keys()))
+        raise ValidationException(
+            message=f"aspect_ratio must be one of {allowed}",
+            param="aspect_ratio",
+            code="invalid_aspect_ratio",
+        )
+    return value
+
+
+def _normalize_resolution_name(resolution_name: Optional[str]) -> Optional[str]:
+    value = (resolution_name or "").strip().lower()
+    if not value:
+        return None
+    if value not in VALID_RESOLUTION_NAMES:
+        raise ValidationException(
+            message=f"resolution_name must be one of {sorted(VALID_RESOLUTION_NAMES)}",
+            param="resolution_name",
+            code="invalid_resolution_name",
+        )
+    return value
+
+
+def _normalize_video_length(video_length: Optional[int]) -> Optional[int]:
+    if video_length in (None, ""):
+        return None
+    value = int(video_length)
+    if value < 6 or value > 30:
+        raise ValidationException(
+            message="video_length must be between 6 and 30",
+            param="video_length",
+            code="invalid_video_length",
+        )
+    return value
+
+
+def _normalize_preset(preset: Optional[str]) -> str:
+    value = (preset or "custom").strip().lower()
+    if value not in VALID_PRESETS:
+        raise ValidationException(
+            message=f"preset must be one of {sorted(VALID_PRESETS)}",
+            param="preset",
+            code="invalid_preset",
         )
     return value
 
@@ -336,6 +410,10 @@ async def _build_payload_and_references_for_form(
     size: Optional[str],
     seconds: Optional[int],
     quality: Optional[str],
+    aspect_ratio: Optional[str],
+    video_length: Optional[int],
+    resolution_name: Optional[str],
+    preset: Optional[str],
     image_reference: Optional[str],
     input_reference: Optional[UploadFile],
 ) -> Tuple[BaseModel, List[str]]:
@@ -347,6 +425,10 @@ async def _build_payload_and_references_for_form(
                 "size": size,
                 "seconds": seconds,
                 "quality": quality,
+                "aspect_ratio": aspect_ratio,
+                "video_length": video_length,
+                "resolution_name": resolution_name,
+                "preset": preset,
                 "image_reference": image_reference,
                 "input_reference": None,
             }
@@ -379,6 +461,17 @@ def _multipart_create_schema(default_seconds: int) -> Dict[str, Any]:
             "size": {"type": "string", "default": "1792x1024"},
             "seconds": {"type": "integer", "default": default_seconds},
             "quality": {"type": "string", "default": "standard"},
+            "aspect_ratio": {
+                "type": "string",
+                "enum": ["16:9", "9:16", "3:2", "2:3", "1:1"],
+            },
+            "video_length": {"type": "integer", "default": default_seconds},
+            "resolution_name": {"type": "string", "enum": ["480p", "720p"]},
+            "preset": {
+                "type": "string",
+                "enum": ["fun", "normal", "spicy", "custom"],
+                "default": "custom",
+            },
             "image_reference": {
                 "type": "string",
                 "description": "JSON string for image_reference array",
@@ -395,6 +488,9 @@ def _build_create_response(
     size: str,
     seconds: int,
     quality: str,
+    aspect_ratio: str,
+    resolution_name: str,
+    preset: str,
     url: str,
 ) -> Dict[str, Any]:
     ts = int(time.time())
@@ -409,6 +505,9 @@ def _build_create_response(
         "size": size,
         "seconds": str(seconds),
         "quality": quality,
+        "aspect_ratio": aspect_ratio,
+        "resolution_name": resolution_name,
+        "preset": preset,
         "url": url,
     }
 
@@ -429,13 +528,23 @@ async def _create_video_from_payload(
         )
 
     model = _normalize_model(payload.model)
-    size, aspect_ratio = _normalize_size(payload.size)
-    quality, resolution = _normalize_quality(payload.quality)
+    size, aspect_ratio_from_size = _normalize_size(payload.size)
+    quality, resolution_from_quality = _normalize_quality(payload.quality)
     seconds = _normalize_seconds(payload.seconds)
-    if require_extension and seconds <= 6:
+
+    native_aspect_ratio = _normalize_aspect_ratio(getattr(payload, "aspect_ratio", None))
+    native_video_length = _normalize_video_length(getattr(payload, "video_length", None))
+    native_resolution_name = _normalize_resolution_name(getattr(payload, "resolution_name", None))
+    preset = _normalize_preset(getattr(payload, "preset", None))
+
+    aspect_ratio = native_aspect_ratio or aspect_ratio_from_size
+    final_seconds = native_video_length or seconds
+    resolution = native_resolution_name or resolution_from_quality
+
+    if require_extension and final_seconds <= 6:
         raise ValidationException(
-            message="seconds must be between 7 and 30 for /video/extend",
-            param="seconds",
+            message="video_length/seconds must be between 7 and 30 for /video/extend",
+            param="video_length",
             code="invalid_seconds",
         )
 
@@ -449,9 +558,9 @@ async def _create_video_from_payload(
         stream=False,
         reasoning_effort=None,
         aspect_ratio=aspect_ratio,
-        video_length=seconds,
+        video_length=final_seconds,
         resolution=resolution,
-        preset="custom",
+        preset=preset,
     )
 
     video_url = _extract_response_video_url(result, request)
@@ -461,8 +570,11 @@ async def _create_video_from_payload(
             model=model,
             prompt=prompt,
             size=size,
-            seconds=seconds,
+            seconds=final_seconds,
             quality=quality,
+            aspect_ratio=aspect_ratio,
+            resolution_name=resolution,
+            preset=preset,
             url=video_url,
         )
     )
@@ -520,6 +632,10 @@ async def create_video(request: Request):
         size=form.get("size"),
         seconds=form.get("seconds"),
         quality=form.get("quality"),
+        aspect_ratio=form.get("aspect_ratio"),
+        video_length=form.get("video_length"),
+        resolution_name=form.get("resolution_name"),
+        preset=form.get("preset"),
         image_reference=form.get("image_reference"),
         input_reference=form.get("input_reference"),
     )
