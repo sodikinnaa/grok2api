@@ -5,6 +5,7 @@ Grok image services.
 import asyncio
 import base64
 import math
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -625,7 +626,13 @@ class ImageWSBaseProcessor(BaseProcessor):
         app_url = get_config("app.app_url")
         if app_url:
             return f"{app_url.rstrip('/')}/v1/files/image/{filename}"
-        return f"/v1/files/image/{filename}"
+
+        server_host = os.getenv("SERVER_HOST", "127.0.0.1")
+        server_port = os.getenv("SERVER_PORT", "8000")
+        if server_host == "0.0.0.0":
+            server_host = "127.0.0.1"
+
+        return f"http://{server_host}:{server_port}/v1/files/image/{filename}"
 
     async def _save_blob(
         self, image_id: str, blob: str, is_final: bool, ext: Optional[str] = None
