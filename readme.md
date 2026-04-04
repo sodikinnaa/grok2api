@@ -97,6 +97,67 @@ docker compose up -d
 
 > Konfigurasikan file `.env`
 
+## CORS / Cross-Origin
+
+Secara default fork ini sekarang membuka CORS untuk **semua origin** agar API lebih mudah dipanggil dari browser lintas domain:
+
+- `allow_origins=["*"]`
+- `allow_methods=["*"]`
+- `allow_headers=["*"]`
+- `allow_credentials=False`
+
+Konfigurasi ini cocok untuk penggunaan API publik berbasis token / bearer auth dari banyak domain.
+
+### Jika ingin host-only / satu domain tertentu
+
+Ubah bagian CORS di `main.py` dari:
+
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+menjadi misalnya:
+
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://api.domainkamu.com"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+### Jika ingin allow beberapa domain tertentu
+
+Gunakan daftar origin eksplisit:
+
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://app.domainkamu.com",
+        "https://admin.domainkamu.com",
+        "https://frontend-lain.com",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+### Catatan penting
+
+- Jika memakai `allow_origins=["*"]`, sebaiknya gunakan `allow_credentials=False`.
+- Jika ingin mengizinkan cookie / browser credentials, gunakan origin spesifik, **jangan wildcard `*`**.
+- Jika masih kena CORS saat deploy, cek juga reverse proxy / CDN di depan aplikasi (misalnya Nginx, Cloudflare, Render, Vercel, Cloud Shell preview URL, dll.) karena redirect/auth gateway di layer luar juga bisa memicu error CORS.
+
 | Nama variabel | Keterangan | Nilai default | Contoh |
 | :-- | :-- | :-- | :-- |
 | `LOG_LEVEL` | Level log | `INFO` | `DEBUG` |
