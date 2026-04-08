@@ -1,6 +1,6 @@
 # Grok2API
 
-[中文](../readme.md) | **English** | [Docs](https://blog.cheny.me/blog/posts/grok2api)
+[README](../readme.md) | **English**
 
 > [!NOTE]
 > This project is for learning and research only. You must comply with Grok **Terms of Use** and **local laws and regulations**. Do not use for illegal purposes.
@@ -15,7 +15,6 @@ Grok2API rebuilt with **FastAPI**, fully aligned with the latest web call format
 <br>
 
 ## Quick Start
-> [Docs](https://blog.cheny.me/blog/posts/grok2api)
 
 ### Local
 
@@ -28,7 +27,7 @@ uv run granian --interface asgi --host 0.0.0.0 --port 8000 --workers 1 main:app
 ### Docker Compose
 
 ```bash
-git clone https://github.com/chenyme/grok2api
+git clone https://github.com/sodikinnaa/grok2api
 
 cd grok2api
 
@@ -46,7 +45,7 @@ docker compose up -d
 
 ### Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/chenyme/grok2api&env=LOG_LEVEL,LOG_FILE_ENABLED,DATA_DIR,SERVER_STORAGE_TYPE,SERVER_STORAGE_URL&envDefaults=%7B%22DATA_DIR%22%3A%22/tmp/data%22%2C%22LOG_FILE_ENABLED%22%3A%22false%22%2C%22LOG_LEVEL%22%3A%22INFO%22%2C%22SERVER_STORAGE_TYPE%22%3A%22local%22%2C%22SERVER_STORAGE_URL%22%3A%22%22%7D)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/sodikinnaa/grok2api&env=LOG_LEVEL,LOG_FILE_ENABLED,DATA_DIR,SERVER_STORAGE_TYPE,SERVER_STORAGE_URL&envDefaults=%7B%22DATA_DIR%22%3A%22/tmp/data%22%2C%22LOG_FILE_ENABLED%22%3A%22false%22%2C%22LOG_LEVEL%22%3A%22INFO%22%2C%22SERVER_STORAGE_TYPE%22%3A%22local%22%2C%22SERVER_STORAGE_URL%22%3A%22%22%7D)
 
 > Set `DATA_DIR=/tmp/data` and disable file logs with `LOG_FILE_ENABLED=false`.
 >
@@ -54,7 +53,7 @@ docker compose up -d
 
 ### Render
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/chenyme/grok2api)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/sodikinnaa/grok2api)
 
 > Render free instances sleep after 15 minutes of inactivity; redeploy/restart will lose data.
 >
@@ -472,6 +471,10 @@ Config file: `data/config.toml`
 
 <br>
 
-## Star History
+## Upstream Credit
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Chenyme/grok2api&type=Timeline)](https://star-history.com/#Chenyme/grok2api&Timeline)
+This repository is based on the original project by Chenyme:
+
+- Upstream: <https://github.com/chenyme/grok2api>
+
+Please keep attribution when redistributing or building on top of this fork.
