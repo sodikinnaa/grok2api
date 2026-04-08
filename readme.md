@@ -18,6 +18,11 @@ Grok2API is a **FastAPI** server that wraps web-based Grok access into a more co
 - Suitable for local hosting, Docker Compose, Vercel, and Render
 - This fork includes deployment-friendly defaults and public-ready documentation
 
+## Documentation
+
+- Hosted docs: <https://localhost:8000/docs>
+- Local English guide: `docs/README.en.md`
+
 <img width="4800" height="4200" alt="Grok2API admin preview" src="https://github.com/user-attachments/assets/a6669674-8afe-4ae5-bf81-a2ec1f864233" />
 
 ## Quick Start
