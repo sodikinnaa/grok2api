@@ -45,6 +45,12 @@ cd grok2api
 docker compose up -d
 ```
 
+If Docker Desktop tries to start optional services you do not need, run only the main app profile:
+
+```bash
+docker compose --profile "" up -d grok2api
+```
+
 Docker Compose port variables:
 
 - `SERVER_PORT`: port listened to by the app inside the container

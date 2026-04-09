@@ -27,8 +27,6 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-    depends_on:
-      - flaresolverr
     restart: unless-stopped
 
   # Opsi proxy egress. Aktifkan manual bila memang diperlukan, lalu arahkan
@@ -47,9 +45,12 @@ services:
       - warp
 
   # FlareSolverr untuk membantu refresh challenge Cloudflare.
+  # Set ENABLE_FLARESOLVERR=true kalau memang diperlukan.
   flaresolverr:
     container_name: flaresolverr
     image: ghcr.io/flaresolverr/flaresolverr:latest
+    profiles:
+      - flaresolverr
     ports:
       - "127.0.0.1:8191:8191"
     environment:
