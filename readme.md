@@ -39,6 +39,11 @@ uv run granian --interface asgi --host 0.0.0.0 --port 8000 --workers 1 main:app
 
 ### Run with Docker Compose
 
+Use the command that matches your environment:
+
+- Docker Compose v2: `docker compose up -d`
+- Docker Compose v1: `docker-compose up -d`
+
 ```bash
 git clone https://github.com/sodikinnaa/grok2api.git
 cd grok2api
@@ -47,10 +52,10 @@ docker compose up -d
 
 If you see an error like `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`, Docker Desktop or the Linux engine is not running yet. Start Docker Desktop first, then retry.
 
-If you only want the main app and not optional services, use:
+If your system only has Compose v1, use:
 
 ```bash
-docker compose up -d grok2api
+docker-compose up -d
 ```
 
 Docker Compose port variables:
