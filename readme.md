@@ -217,6 +217,8 @@ Examples below use `localhost:8000`. If you set `HOST_PORT` in Docker Compose, r
 
 General-purpose endpoint supporting chat, image generation, image editing, video generation, and video upscaling.
 
+Linux/macOS or Git Bash:
+
 ```bash
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -225,6 +227,25 @@ curl http://localhost:8000/v1/chat/completions \
     "model": "grok-4",
     "messages": [{"role":"user","content":"Hello"}]
   }'
+```
+
+Windows PowerShell:
+
+```powershell
+$body = @'
+{
+  "model": "grok-4",
+  "messages": [{"role":"user","content":"Hello"}]
+}
+'@
+
+Invoke-RestMethod -Uri "http://localhost:8000/v1/chat/completions" `
+  -Method Post `
+  -Headers @{
+    "Content-Type" = "application/json"
+    "Authorization" = "Bearer $env:GROK2API_API_KEY"
+  } `
+  -Body $body
 ```
 
 <details>
