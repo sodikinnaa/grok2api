@@ -22,6 +22,9 @@ Grok2API is a **FastAPI** server that wraps web-based Grok access into a more co
 
 - API docs: `http://localhost:8000/docs`
 - Local English guide: `docs/README.en.md`
+- User guide, Linux: `docs/userguide-linux.md`
+- User guide, macOS: `docs/userguide-macos.md`
+- User guide, Git Bash: `docs/userguide-gitbash.md`
 
 <img width="4800" height="4200" alt="Grok2API admin preview" src="https://github.com/user-attachments/assets/a6669674-8afe-4ae5-bf81-a2ec1f864233" />
 
@@ -216,37 +219,6 @@ Examples below use `localhost:8000`. If you set `HOST_PORT` in Docker Compose, r
 ### `POST /v1/chat/completions`
 
 General-purpose endpoint supporting chat, image generation, image editing, video generation, and video upscaling.
-
-Linux/macOS or Git Bash:
-
-```bash
-curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $GROK2API_API_KEY" \
-  -d '{
-    "model": "grok-4",
-    "messages": [{"role":"user","content":"Hello"}]
-  }'
-```
-
-Windows PowerShell:
-
-```powershell
-$body = @'
-{
-  "model": "grok-4",
-  "messages": [{"role":"user","content":"Hello"}]
-}
-'@
-
-Invoke-RestMethod -Uri "http://localhost:8000/v1/chat/completions" `
-  -Method Post `
-  -Headers @{
-    "Content-Type" = "application/json"
-    "Authorization" = "Bearer $env:GROK2API_API_KEY"
-  } `
-  -Body $body
-```
 
 <details>
 <summary>Supported request parameters</summary>
