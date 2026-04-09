@@ -45,10 +45,12 @@ cd grok2api
 docker compose up -d
 ```
 
-If Docker Desktop tries to start optional services you do not need, run only the main app profile:
+If you see an error like `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`, Docker Desktop or the Linux engine is not running yet. Start Docker Desktop first, then retry.
+
+If you only want the main app and not optional services, use:
 
 ```bash
-docker compose --profile "" up -d grok2api
+docker compose up -d grok2api
 ```
 
 Docker Compose port variables:
