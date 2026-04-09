@@ -39,10 +39,22 @@ uv run granian --interface asgi --host 0.0.0.0 --port 8000 --workers 1 main:app
 
 ### Run with Docker Compose
 
-Use the command that matches your environment:
+#### Windows
+
+If you are on Windows, check which Compose you have:
 
 - Docker Compose v2: `docker compose up -d`
 - Docker Compose v1: `docker-compose up -d`
+
+If `docker compose` gives an error, install or use `docker-compose` instead.
+
+```powershell
+git clone https://github.com/sodikinnaa/grok2api.git
+cd grok2api
+docker-compose up -d
+```
+
+#### Linux / macOS
 
 ```bash
 git clone https://github.com/sodikinnaa/grok2api.git
